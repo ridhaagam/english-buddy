@@ -15,7 +15,7 @@ from app.core.security import create_access_token, decode_token
 from app.models.module import Module, ModuleStatus, TopicType
 from app.models.question import Question
 from app.models.session import Session, SessionAnswer, SessionEvent
-from app.services.storage import get_file_path, object_exists, put_object
+from app.services.storage import append_object, get_file_path, object_exists, put_object
 
 logger = logging.getLogger(__name__)
 
@@ -124,14 +124,24 @@ async def my_sessions(
             .limit(50)
         )
     rows = result.all()
-    return [
-        {
+    now = datetime.now(timezone.utc)
+    out = []
+    for s, m in rows:
+        if m.reveal_at:
+            revealed = now >= m.reveal_at
+        elif m.show_answers_after_deadline and m.deadline:
+            revealed = now >= m.deadline
+        elif m.show_answers_after_deadline:
+            revealed = True
+        else:
+            revealed = False
+        out.append({
             "id": str(s.id),
             "module_id": str(s.module_id),
             "module_title": m.title,
             "module_topic": m.topic.value,
-            "score_pct": s.score_pct,
-            "correct_count": s.correct_count,
+            "score_pct": s.score_pct if revealed else None,
+            "correct_count": s.correct_count if revealed else None,
             "total": s.total,
             "xp_earned": s.xp_earned,
             "tab_switch_count": s.tab_switch_count,
@@ -139,9 +149,9 @@ async def my_sessions(
             "finished_at": s.finished_at.isoformat() if s.finished_at else None,
             "recording_blob": s.recording_blob,
             "flagged": s.flagged,
-        }
-        for s, m in rows
-    ]
+            "answers_revealed": revealed,
+        })
+    return out
 
 
 @router.get("/sessions/me/{session_id}/play-url")
@@ -357,7 +367,20 @@ async def finish_session(
     except Exception:
         pass
 
-    return {"score_pct": score_pct, "correct_count": correct_count, "total": total, "xp_earned": xp}
+    mod_r = await db.execute(select(Module).where(Module.id == session.module_id))
+    module = mod_r.scalar_one_or_none()
+    answers_revealed = True
+    if module:
+        if module.reveal_at:
+            answers_revealed = datetime.now(timezone.utc) >= module.reveal_at
+        elif module.show_answers_after_deadline and module.deadline:
+            answers_revealed = datetime.now(timezone.utc) >= module.deadline
+        elif module.show_answers_after_deadline:
+            answers_revealed = True
+        else:
+            answers_revealed = False
+
+    return {"score_pct": score_pct, "correct_count": correct_count, "total": total, "xp_earned": xp, "answers_revealed": answers_revealed}
 
 
 @router.post("/sessions/{session_id}/recording-chunk", status_code=204)
@@ -377,7 +400,7 @@ async def upload_recording_chunk(
 
     key = f"recordings/{session_id}.webm"
     try:
-        put_object(key, data, "video/webm")
+        append_object(key, data, "video/webm")
     except Exception:
         logger.exception("Storage write failed for session %s", session_id)
         raise HTTPException(500, "Failed to save recording")

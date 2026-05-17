@@ -31,9 +31,12 @@ export function TestScreen({ moduleId, onExit, onDone }: Props) {
   const answersRef = useRef<any[]>([]);
   // Promises for background answer saves (intermediate questions)
   const pendingRef = useRef<Promise<any>[]>([]);
+  // proctoringMetaRef mirrors state so submit() always reads the latest value
+  const proctoringMetaRef = useRef<Record<string, { tab_switch: boolean; face_anomaly: boolean }>>({});
   const camRef = useRef<{
     stopAndUpload: (sessionId: string) => Promise<void>;
     onFaceAnomaly: (questionId: string) => void;
+    setSessionId: (id: string) => void;
   }>(null);
 
   // Step 1: Create session immediately on mount (no module pre-fetch needed)
@@ -41,6 +44,7 @@ export function TestScreen({ moduleId, onExit, onDone }: Props) {
     api.sessions.create(moduleId)
       .then((data) => {
         setSessionId(data.id);
+        camRef.current?.setSessionId?.(data.id);
         api.sessions.logEvent(data.id, "open").catch(() => {});
       })
       .catch((err: Error) => {
@@ -80,10 +84,12 @@ export function TestScreen({ moduleId, onExit, onDone }: Props) {
     const handler = () => {
       if (document.visibilityState === "hidden") {
         setTabSwitchCount((c) => c + 1);
-        setProctoringMeta((prev) => ({
-          ...prev,
-          [q.id]: { ...(prev[q.id] ?? {}), tab_switch: true, face_anomaly: prev[q.id]?.face_anomaly ?? false },
-        }));
+        const updated = {
+          ...proctoringMetaRef.current,
+          [q.id]: { ...(proctoringMetaRef.current[q.id] ?? { tab_switch: false, face_anomaly: false }), tab_switch: true },
+        };
+        proctoringMetaRef.current = updated;
+        setProctoringMeta(updated);
         setTabAlert(true);
         setTimeout(() => setTabAlert(false), 3000);
       }
@@ -94,10 +100,12 @@ export function TestScreen({ moduleId, onExit, onDone }: Props) {
 
   const handleFaceAnomaly = useCallback((questionId: string) => {
     setFaceAnomalyCount((c) => c + 1);
-    setProctoringMeta((prev) => ({
-      ...prev,
-      [questionId]: { ...(prev[questionId] ?? {}), face_anomaly: true, tab_switch: prev[questionId]?.tab_switch ?? false },
-    }));
+    const updated = {
+      ...proctoringMetaRef.current,
+      [questionId]: { ...(proctoringMetaRef.current[questionId] ?? { tab_switch: false, face_anomaly: false }), face_anomaly: true },
+    };
+    proctoringMetaRef.current = updated;
+    setProctoringMeta(updated);
   }, []);
 
   const rightCol = useMemo(() => {
@@ -166,7 +174,7 @@ export function TestScreen({ moduleId, onExit, onDone }: Props) {
 
     const selection = buildSelection();
     const timeMs = Date.now() - qStartRef.current;
-    const meta = proctoringMeta[q.id] ?? { tab_switch: false, face_anomaly: false };
+    const meta = proctoringMetaRef.current[q.id] ?? { tab_switch: false, face_anomaly: false };
     const answerPayload = {
       question_id: q.id,
       selection,
@@ -214,6 +222,7 @@ export function TestScreen({ moduleId, onExit, onDone }: Props) {
           module_id: moduleId,
           answers: answersRef.current,
           timeMs: Date.now() - startRef.current,
+          answers_revealed: (result as any).answers_revealed ?? true,
         });
       } catch {
         if (camRef.current) await camRef.current.stopAndUpload(sessionId).catch(() => {});
@@ -381,8 +390,8 @@ export function TestScreen({ moduleId, onExit, onDone }: Props) {
                   setExitDialog(false);
                   if (sessionId) {
                     try {
-                      // Save any background answers, then finish the session
                       await Promise.allSettled(pendingRef.current);
+                      if (camRef.current) await camRef.current.stopAndUpload(sessionId).catch(() => {});
                       await api.sessions.finish(sessionId, {
                         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
                         tab_switch_count: tabSwitchCount,
@@ -531,15 +540,27 @@ function FillSentence({ sentence, pick }: { sentence: string; pick: any }) {
 // ─── CameraCapture ────────────────────────────────────────────────────────────
 
 const CameraCapture = forwardRef<
-  { stopAndUpload: (sessionId: string) => Promise<void>; onFaceAnomaly: (questionId: string) => void },
+  { stopAndUpload: (sessionId: string) => Promise<void>; onFaceAnomaly: (questionId: string) => void; setSessionId: (id: string) => void },
   { currentQuestionId: string; onFaceAnomaly: (questionId: string) => void }
 >(function CameraCapture({ currentQuestionId, onFaceAnomaly }, ref) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const sessionIdRef = useRef<string | null>(null);
+  const uploadQueueRef = useRef<Promise<void>>(Promise.resolve());
   const streamRef = useRef<MediaStream | null>(null);
   const currentQIdRef = useRef(currentQuestionId);
   useEffect(() => { currentQIdRef.current = currentQuestionId; }, [currentQuestionId]);
+
+  const uploadChunk = (blob: Blob, sid: string) => {
+    const fd = new FormData();
+    fd.append("chunk", blob, "recording.webm");
+    return fetch(`/api/v1/sessions/${sid}/recording-chunk`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` },
+      body: fd,
+    }).catch(() => {});
+  };
 
   type CamStatus = "loading" | "active" | "blocked" | "insecure" | "unavailable" | "uploading" | "done";
   const [status, setStatus] = useState<CamStatus>("loading");
@@ -554,29 +575,27 @@ const CameraCapture = forwardRef<
   const [retryCount, setRetryCount] = useState(0);
 
   useImperativeHandle(ref, () => ({
-    stopAndUpload: async (sessionId: string) => {
+    setSessionId: (id: string) => {
+      sessionIdRef.current = id;
+      // Flush any chunks buffered before sessionId was known
+      for (const chunk of chunksRef.current) {
+        const c = chunk;
+        uploadQueueRef.current = uploadQueueRef.current.then(() => uploadChunk(c, id) as Promise<void>);
+      }
+      chunksRef.current = [];
+    },
+    stopAndUpload: async (_sessionId: string) => {
       const recorder = recorderRef.current;
       if (!recorder || recorder.state === "inactive") return;
       setStatus("uploading");
+      // Stop triggers a final ondataavailable with remaining data
       await new Promise<void>((resolve) => {
-        recorder.onstop = async () => {
-          if (chunksRef.current.length > 0) {
-            const blob = new Blob(chunksRef.current, { type: "video/webm" });
-            const fd = new FormData();
-            fd.append("chunk", blob, "recording.webm");
-            try {
-              await fetch(`/api/v1/sessions/${sessionId}/recording-chunk`, {
-                method: "POST",
-                headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` },
-                body: fd,
-              });
-            } catch {}
-          }
-          setStatus("done");
-          resolve();
-        };
+        recorder.onstop = () => resolve();
         recorder.stop();
       });
+      // Wait for all queued chunk uploads to finish
+      await uploadQueueRef.current;
+      setStatus("done");
     },
     onFaceAnomaly,
   }));
@@ -606,7 +625,15 @@ const CameraCapture = forwardRef<
           ? "video/webm;codecs=vp9" : "video/webm";
         const recorder = new MediaRecorder(stream, { mimeType });
         recorderRef.current = recorder;
-        recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+        recorder.ondataavailable = (e) => {
+          if (e.data.size <= 0) return;
+          if (sessionIdRef.current) {
+            const sid = sessionIdRef.current;
+            uploadQueueRef.current = uploadQueueRef.current.then(() => uploadChunk(e.data, sid) as Promise<void>);
+          } else {
+            chunksRef.current.push(e.data);
+          }
+        };
         recorder.start(5000);
 
         // Load face-api weights from local public folder — use WebGL backend for GPU inference

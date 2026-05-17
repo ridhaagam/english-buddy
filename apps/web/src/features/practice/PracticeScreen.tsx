@@ -61,7 +61,10 @@ export function PracticeScreen({ onStartTest, onViewSession }: Props) {
                     </span>
                   </td>
                   <td data-label="Score" style={tdStyle}>
-                    <span className="serif" style={{ fontSize: 18, fontWeight: 600 }}>{s.score_pct}%</span>
+                    {s.answers_revealed === false
+                      ? <span className="mono" style={{ fontSize: 11, color: "var(--ink-3)" }}>🔒 hidden</span>
+                      : <span className="serif" style={{ fontSize: 18, fontWeight: 600 }}>{s.score_pct}%</span>
+                    }
                   </td>
                   <td data-label="XP" style={tdStyle}>
                     <span className="mono" style={{ fontSize: 12, color: "var(--accent-ink)" }}>+{s.xp_earned} XP</span>

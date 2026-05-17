@@ -14,6 +14,11 @@ def put_object(key: str, body: bytes, content_type: str = "application/octet-str
     _path(key).write_bytes(body)
 
 
+def append_object(key: str, body: bytes, content_type: str = "application/octet-stream") -> None:
+    with open(_path(key), "ab") as f:
+        f.write(body)
+
+
 def object_exists(key: str) -> bool:
     return _path(key).exists()
 

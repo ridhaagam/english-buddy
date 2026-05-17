@@ -12,6 +12,7 @@ export function ResultsScreen({ result, onRetry, onHome }: Props) {
   const xp = result?.xp_earned ?? 0;
   const timeMs = result?.timeMs ?? 0;
   const answers = result?.answers ?? [];
+  const answersRevealed: boolean = result?.answers_revealed ?? true;
   const perfect = pct === 100;
   const passed = pct >= 70;
 
@@ -100,7 +101,16 @@ export function ResultsScreen({ result, onRetry, onHome }: Props) {
           </div>
         </div>
 
-        {answers.length > 0 && (
+        {!answersRevealed && (
+          <div style={{ padding: "14px 18px", borderRadius: "var(--r-md)", background: "oklch(0.97 0.03 85)", border: "1px solid oklch(0.88 0.06 85)" }}>
+            <strong style={{ fontSize: 14 }}>Results not yet available</strong>
+            <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--ink-2)" }}>
+              Correct answers will be revealed by your instructor at a later date.
+            </p>
+          </div>
+        )}
+
+        {answersRevealed && answers.length > 0 && (
           <div className="ans-list">
             <p className="eyebrow" style={{ marginBottom: 10 }}>Answer breakdown</p>
             {answers.map((a: any, i: number) => (
