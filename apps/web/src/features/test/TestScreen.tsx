@@ -543,7 +543,7 @@ const CameraCapture = forwardRef<
   { stopAndUpload: (sessionId: string) => Promise<void>; onFaceAnomaly: (questionId: string) => void; setSessionId: (id: string) => void },
   { currentQuestionId: string; onFaceAnomaly: (questionId: string) => void }
 >(function CameraCapture({ currentQuestionId, onFaceAnomaly }, ref) {
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const sessionIdRef = useRef<string | null>(null);
@@ -552,6 +552,15 @@ const CameraCapture = forwardRef<
   const currentQIdRef = useRef(currentQuestionId);
   useEffect(() => { currentQIdRef.current = currentQuestionId; }, [currentQuestionId]);
 
+  // Callback ref: sets srcObject the instant the <video> element mounts
+  const videoCallbackRef = useCallback((node: HTMLVideoElement | null) => {
+    videoRef.current = node;
+    if (node && streamRef.current) {
+      node.srcObject = streamRef.current;
+      node.play().catch(() => {});
+    }
+  }, []);
+
   const uploadChunk = (blob: Blob, sid: string) => {
     const fd = new FormData();
     fd.append("chunk", blob, "recording.webm");
@@ -559,8 +568,20 @@ const CameraCapture = forwardRef<
       method: "POST",
       headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` },
       body: fd,
+      keepalive: true,
     }).catch(() => {});
   };
+
+  // Flush any buffered encoder data when the tab is hidden (covers close/switch)
+  useEffect(() => {
+    const flush = () => {
+      if (document.visibilityState === "hidden" && recorderRef.current?.state === "recording") {
+        recorderRef.current.requestData();
+      }
+    };
+    document.addEventListener("visibilitychange", flush);
+    return () => document.removeEventListener("visibilitychange", flush);
+  }, []);
 
   type CamStatus = "loading" | "active" | "blocked" | "insecure" | "unavailable" | "uploading" | "done";
   const [status, setStatus] = useState<CamStatus>("loading");
@@ -601,24 +622,22 @@ const CameraCapture = forwardRef<
   }));
 
   useEffect(() => {
-    if (status === "active" && videoRef.current && streamRef.current) {
-      videoRef.current.srcObject = streamRef.current;
-      videoRef.current.play().catch(() => {});
-    }
-  }, [status]);
-
-  useEffect(() => {
     if (consent !== "granted") return;
     if (!window.isSecureContext || !navigator.mediaDevices) {
       setStatus("insecure");
       return;
     }
 
-    let faceTimer: ReturnType<typeof setInterval>;
+    let faceActive = true;
 
     navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 } } })
       .then((stream) => {
         streamRef.current = stream;
+        // If the video element is already mounted, wire it up immediately
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play().catch(() => {});
+        }
         setStatus("active");
 
         const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
@@ -636,29 +655,31 @@ const CameraCapture = forwardRef<
         };
         recorder.start(5000);
 
-        // Load face-api weights from local public folder — use WebGL backend for GPU inference
+        // Sequential async detection loop — each inference waits for the previous to complete,
+        // preventing GPU saturation that causes the live video feed to freeze
         import("face-api.js").then(async (faceapi) => {
           try {
-            // Explicitly request WebGL (GPU) backend; fall back to CPU if unavailable
             try { await (faceapi as any).tf.setBackend("webgl"); } catch {}
             await Promise.all([
               faceapi.nets.tinyFaceDetector.loadFromUri("/face-api-weights"),
               faceapi.nets.faceLandmark68Net.loadFromUri("/face-api-weights"),
             ]);
             setFaceDetAvail(true);
-            faceTimer = setInterval(async () => {
-              if (!videoRef.current || videoRef.current.readyState < 2) return;
+            while (faceActive) {
+              await new Promise<void>((r) => setTimeout(r, 2000));
+              if (!faceActive) break;
+              if (!videoRef.current || videoRef.current.readyState < 2) continue;
               try {
                 const results = await faceapi
                   .detectAllFaces(videoRef.current, new faceapi.TinyFaceDetectorOptions({ scoreThreshold: 0.5 }))
                   .withFaceLandmarks();
+                if (!faceActive) break;
                 const count = results.length;
                 setFaceCount(count);
 
                 let anomaly = count !== 1;
                 let gazeGood = count === 1;
 
-                // Gaze check — if exactly one face, verify eyes are roughly centred
                 if (count === 1) {
                   const lms = results[0].landmarks;
                   const box = results[0].detection.box;
@@ -676,14 +697,13 @@ const CameraCapture = forwardRef<
                 }
 
                 setGazeOk(gazeGood);
-
                 if (anomaly) {
                   onFaceAnomaly(currentQIdRef.current);
                   setFaceAlert(true);
                   setTimeout(() => setFaceAlert(false), 3000);
                 }
               } catch {}
-            }, 2000);
+            }
           } catch {
             setFaceDetAvail(false);
           }
@@ -703,7 +723,7 @@ const CameraCapture = forwardRef<
       });
 
     return () => {
-      clearInterval(faceTimer);
+      faceActive = false;
       streamRef.current?.getTracks().forEach((t) => t.stop());
     };
   }, [consent, retryCount]);
@@ -803,7 +823,7 @@ const CameraCapture = forwardRef<
 
       {(status === "active" || status === "uploading" || status === "done") && (
         <div style={{ position: "relative", borderRadius: "var(--r-lg)", overflow: "hidden", background: "#000", lineHeight: 0 }}>
-          <video ref={videoRef} autoPlay muted playsInline style={{ width: "100%", display: "block", maxHeight: 220, objectFit: "cover" }} />
+          <video ref={videoCallbackRef} autoPlay muted playsInline style={{ width: "100%", display: "block", maxHeight: 220, objectFit: "cover" }} />
           {faceAlert && (
             <div style={{ position: "absolute", top: 8, left: 8, right: 8, background: "rgba(220,30,30,0.85)", padding: "5px 10px", borderRadius: 8, fontSize: 11, color: "white", textAlign: "center", fontWeight: 600 }}>
               ⚠ {faceCount === 0 ? "No face detected" : faceCount && faceCount > 1 ? "Multiple faces detected" : "Please look at the screen"}

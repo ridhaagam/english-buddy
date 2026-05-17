@@ -65,6 +65,7 @@ export function SessionDetailPage({ sessionId, onBack, onPracticeAgain }: Props)
   const answersRevealed = session.answers_revealed;
   const revealAt = session.reveal_at ? new Date(session.reveal_at) : null;
   const totalTime = (session.answers ?? []).reduce((sum: number, a: any) => sum + (a.time_spent_ms ?? 0), 0);
+  const flaggedAnswers = (session.answers ?? []).filter((a: any) => a.tab_switch || a.face_anomaly);
 
   const pct = session.score_pct ?? 0;
   const r = 38;
@@ -145,7 +146,7 @@ export function SessionDetailPage({ sessionId, onBack, onPracticeAgain }: Props)
         </div>
       )}
 
-      {/* Recording */}
+      {/* Recording + proctoring events side-by-side */}
       {session.recording_blob && (
         <div className="card" style={{ marginBottom: 16, padding: "16px 20px" }}>
           {!videoShown ? (
@@ -156,6 +157,22 @@ export function SessionDetailPage({ sessionId, onBack, onPracticeAgain }: Props)
             <video controls preload="metadata" style={{ width: "100%", borderRadius: "var(--r-md)", maxHeight: 260 }} src={playUrl} />
           ) : (
             <div style={{ padding: "20px 0", textAlign: "center", color: "var(--ink-3)" }}>Loading…</div>
+          )}
+
+          {/* Proctoring event legend — shown once video is visible */}
+          {flaggedAnswers.length > 0 && (
+            <div style={{ marginTop: 14, padding: "10px 14px", borderRadius: "var(--r-sm)", background: "oklch(0.97 0.04 58)", border: "1px solid oklch(0.87 0.07 58)" }}>
+              <p className="eyebrow" style={{ margin: "0 0 8px", color: "oklch(0.42 0.1 58)", fontSize: 10 }}>Proctoring events during this session</p>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {(session.answers ?? []).map((a: any, i: number) =>
+                  (a.tab_switch || a.face_anomaly) ? (
+                    <span key={i} style={{ fontFamily: "var(--font-mono)", fontSize: 10, padding: "2px 8px", borderRadius: 999, background: "oklch(0.92 0.06 58)", border: "1px solid oklch(0.82 0.08 58)", color: "oklch(0.4 0.1 58)" }}>
+                      Q{i + 1}{a.tab_switch ? " · tab" : ""}{a.face_anomaly ? " · face" : ""}
+                    </span>
+                  ) : null
+                )}
+              </div>
+            </div>
           )}
         </div>
       )}
@@ -196,7 +213,11 @@ export function SessionDetailPage({ sessionId, onBack, onPracticeAgain }: Props)
               )}
 
               <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ margin: "0 0 8px", fontSize: 14, fontWeight: 500 }}>{a.question_prompt || `Question ${i + 1}`}</p>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6, flexWrap: "wrap" }}>
+                  <p style={{ margin: 0, fontSize: 14, fontWeight: 500 }}>{a.question_prompt || `Question ${i + 1}`}</p>
+                  {a.tab_switch && <ProcChip label="tab switch" hue={50} />}
+                  {a.face_anomaly && <ProcChip label="face anomaly" hue={25} />}
+                </div>
 
                 {/* Choices breakdown */}
                 {(a.kind === "choice" || a.kind === "fill") && (a.payload?.choices ?? []).length > 0 ? (
@@ -237,6 +258,18 @@ export function SessionDetailPage({ sessionId, onBack, onPracticeAgain }: Props)
         @media(max-width:520px) { .sd-header{flex-direction:column} }
       `}</style>
     </div>
+  );
+}
+
+function ProcChip({ label, hue }: { label: string; hue: number }) {
+  return (
+    <span style={{
+      fontFamily: "var(--font-mono)", fontSize: 10, padding: "1px 7px", borderRadius: 999,
+      background: `oklch(0.95 0.04 ${hue})`, color: `oklch(0.45 0.1 ${hue})`,
+      border: `1px solid oklch(0.87 0.06 ${hue})`, flexShrink: 0,
+    }}>
+      {label}
+    </span>
   );
 }
 
