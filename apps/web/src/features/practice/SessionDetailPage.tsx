@@ -14,6 +14,20 @@ function formatTime(ms: number) {
   return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
 }
 
+function formatSelection(kind: string, selection: any, payload: any): string {
+  if (!selection) return "—";
+  if (kind === "match") {
+    return Object.entries(selection).map(([l, r]) => `${l} → ${r}`).join(", ");
+  }
+  const choiceId = selection.choice;
+  if (!choiceId) return "—";
+  if (kind === "fill" && !payload?.choices?.length) {
+    return choiceId; // free-text fill
+  }
+  const choice = payload?.choices?.find((c: any) => c.id === choiceId);
+  return choice?.label ?? choiceId;
+}
+
 export function SessionDetailPage({ sessionId, onBack, onPracticeAgain }: Props) {
   const [playUrl, setPlayUrl] = useState<string | null>(null);
   const [videoShown, setVideoShown] = useState(false);
@@ -118,11 +132,15 @@ export function SessionDetailPage({ sessionId, onBack, onPracticeAgain }: Props)
       </div>
 
       {/* Reveal notice */}
-      {!answersRevealed && revealAt && (
+      {!answersRevealed && (
         <div style={{ marginBottom: 16, padding: "14px 18px", borderRadius: "var(--r-md)", background: "oklch(0.97 0.03 85)", border: "1px solid oklch(0.88 0.06 85)" }}>
-          <strong style={{ fontSize: 14 }}>Results not yet available</strong>
+          <strong style={{ fontSize: 14 }}>
+            {revealAt ? "Results not yet available" : "Results locked by instructor"}
+          </strong>
           <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--ink-2)" }}>
-            Your answers and score will be visible after {revealAt.toLocaleString()}.
+            {revealAt
+              ? `Correct answers and your score will be visible after ${revealAt.toLocaleString()}.`
+              : "Your instructor has chosen not to reveal correct answers for this module."}
           </p>
         </div>
       )}
@@ -151,48 +169,58 @@ export function SessionDetailPage({ sessionId, onBack, onPracticeAgain }: Props)
         {(session.answers ?? []).length === 0 && (
           <p style={{ color: "var(--ink-3)", fontSize: 13 }}>No answer data.</p>
         )}
-        {(session.answers ?? []).map((a: any, i: number) => (
-          <div key={i} style={{
-            marginBottom: 8,
-            borderRadius: "var(--r-sm)",
-            padding: "12px 14px",
-            background: "var(--bg-2)",
-            border: a.flagged ? "1px solid oklch(0.85 0.08 40)" : "1px solid var(--line-2)",
-            display: "flex",
-            alignItems: "flex-start",
-            gap: 12,
-          }}>
-            {/* Result icon — only if revealed */}
-            {answersRevealed && a.is_correct !== null && (
-              <div style={{
-                width: 24, height: 24, borderRadius: "50%", display: "grid", placeItems: "center", flexShrink: 0, marginTop: 1,
-                background: a.is_correct ? "var(--accent-soft)" : "oklch(0.95 0.04 25)",
-                color: a.is_correct ? "var(--accent-ink)" : "oklch(0.5 0.1 25)",
-              }}>
-                {a.is_correct ? <CheckIcon size={12} /> : <XIcon size={12} />}
-              </div>
-            )}
-            {!answersRevealed && (
-              <div style={{ width: 24, height: 24, borderRadius: "50%", background: "var(--line)", flexShrink: 0, marginTop: 1 }} />
-            )}
-            <div style={{ flex: 1 }}>
-              <p style={{ margin: "0 0 4px", fontSize: 14, fontWeight: 500 }}>{a.question_prompt || `Question ${i + 1}`}</p>
-              {a.flagged && (
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, padding: "2px 8px", borderRadius: 999, marginBottom: 4, background: "oklch(0.95 0.06 40)", color: "oklch(0.45 0.12 40)" }}>
-                  <FlagIcon size={10} /> Flagged by admin
-                </span>
-              )}
-              {a.admin_comment && (
-                <div style={{ marginTop: 4, padding: "6px 10px", background: "oklch(0.97 0.03 85)", borderRadius: "var(--r-sm)", border: "1px solid oklch(0.88 0.06 85)", fontSize: 13, color: "oklch(0.4 0.1 85)" }}>
-                  <strong>Admin note:</strong> {a.admin_comment}
+        {(session.answers ?? []).map((a: any, i: number) => {
+          const userAnswer = formatSelection(a.kind, a.selection, a.payload);
+          return (
+            <div key={i} style={{
+              marginBottom: 8,
+              borderRadius: "var(--r-sm)",
+              padding: "12px 14px",
+              background: "var(--bg-2)",
+              border: a.flagged ? "1px solid oklch(0.85 0.08 40)" : "1px solid var(--line-2)",
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 12,
+            }}>
+              {/* Result icon — only if revealed */}
+              {answersRevealed && a.is_correct !== null ? (
+                <div style={{
+                  width: 24, height: 24, borderRadius: "50%", display: "grid", placeItems: "center", flexShrink: 0, marginTop: 2,
+                  background: a.is_correct ? "var(--accent-soft)" : "oklch(0.95 0.04 25)",
+                  color: a.is_correct ? "var(--accent-ink)" : "oklch(0.5 0.1 25)",
+                }}>
+                  {a.is_correct ? <CheckIcon size={12} /> : <XIcon size={12} />}
                 </div>
+              ) : (
+                <div style={{ width: 24, height: 24, borderRadius: "50%", background: "var(--bg-2)", border: "1.5px solid var(--line)", flexShrink: 0, marginTop: 2 }} />
+              )}
+
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ margin: "0 0 5px", fontSize: 14, fontWeight: 500 }}>{a.question_prompt || `Question ${i + 1}`}</p>
+
+                {/* Always show what the user answered */}
+                <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap", marginBottom: 2 }}>
+                  <span style={{ fontSize: 11, color: "var(--ink-3)", flexShrink: 0 }}>Your answer:</span>
+                  <span style={{ fontSize: 13, color: "var(--ink-2)", fontStyle: "italic" }}>{userAnswer}</span>
+                </div>
+
+                {a.flagged && (
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, padding: "2px 8px", borderRadius: 999, marginTop: 4, background: "oklch(0.95 0.06 40)", color: "oklch(0.45 0.12 40)" }}>
+                    <FlagIcon size={10} /> Flagged by admin
+                  </span>
+                )}
+                {a.admin_comment && (
+                  <div style={{ marginTop: 6, padding: "6px 10px", background: "oklch(0.97 0.03 85)", borderRadius: "var(--r-sm)", border: "1px solid oklch(0.88 0.06 85)", fontSize: 13, color: "oklch(0.4 0.1 85)" }}>
+                    <strong>Admin note:</strong> {a.admin_comment}
+                  </div>
+                )}
+              </div>
+              {a.time_spent_ms != null && (
+                <span className="mono" style={{ fontSize: 11, color: "var(--ink-3)", flexShrink: 0, marginTop: 2 }}>{Math.round(a.time_spent_ms / 1000)}s</span>
               )}
             </div>
-            {a.time_spent_ms != null && (
-              <span className="mono" style={{ fontSize: 11, color: "var(--ink-3)", flexShrink: 0 }}>{Math.round(a.time_spent_ms / 1000)}s</span>
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <style>{`

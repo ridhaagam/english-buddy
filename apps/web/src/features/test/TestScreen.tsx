@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, forwardRef, useImperativeHandle, useCallback } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { ProgressBar, XIcon, ClockIcon, ArrowRightIcon, CheckIcon } from "../../components/ui";
 import { api } from "../../lib/api";
 
@@ -11,6 +11,7 @@ type Props = {
 
 export function TestScreen({ moduleId, onExit, onDone }: Props) {
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionError, setSessionError] = useState<string | null>(null);
   const [idx, setIdx] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
   const [fillInput, setFillInput] = useState("");
@@ -23,46 +24,43 @@ export function TestScreen({ moduleId, onExit, onDone }: Props) {
   const [proctoringMeta, setProctoringMeta] = useState<Record<string, { tab_switch: boolean; face_anomaly: boolean }>>({});
   const [tabAlert, setTabAlert] = useState(false);
   const [exitDialog, setExitDialog] = useState(false);
+  const [finishing, setFinishing] = useState(false);
   const startRef = useRef(Date.now());
   const qStartRef = useRef(Date.now());
+  // answersRef mirrors answers state — always up-to-date even inside async callbacks
+  const answersRef = useRef<any[]>([]);
+  // Promises for background answer saves (intermediate questions)
+  const pendingRef = useRef<Promise<any>[]>([]);
   const camRef = useRef<{
     stopAndUpload: (sessionId: string) => Promise<void>;
     onFaceAnomaly: (questionId: string) => void;
   }>(null);
 
-  // Fetch module metadata first (no shuffle)
-  const { data: moduleMeta, isLoading } = useQuery({
-    queryKey: ["module-meta", moduleId],
-    queryFn: () => api.modules.get(moduleId),
-  });
+  // Step 1: Create session immediately on mount (no module pre-fetch needed)
+  useEffect(() => {
+    api.sessions.create(moduleId)
+      .then((data) => {
+        setSessionId(data.id);
+        api.sessions.logEvent(data.id, "open").catch(() => {});
+      })
+      .catch((err: Error) => {
+        setSessionError(err.message ?? "Failed to start this module");
+      });
+  }, [moduleId]);
 
-  // Once session exists, refetch with session_id for deterministic shuffle
-  const { data: module } = useQuery({
+  // Step 2: Once we have the session ID, fetch module with shuffle seed
+  const { data: module, isLoading } = useQuery({
     queryKey: ["module", moduleId, sessionId],
     queryFn: () => api.modules.get(moduleId, sessionId!),
     enabled: !!sessionId,
   });
-
-  const displayModule = module ?? moduleMeta;
 
   useEffect(() => {
     const t = setInterval(() => setElapsed(Date.now() - startRef.current), 500);
     return () => clearInterval(t);
   }, []);
 
-  const createSession = useMutation({
-    mutationFn: () => api.sessions.create(moduleId),
-    onSuccess: (data) => {
-      setSessionId(data.id);
-      api.sessions.logEvent(data.id, "open").catch(() => {});
-    },
-  });
-
-  useEffect(() => {
-    if (moduleMeta && !sessionId) createSession.mutate();
-  }, [moduleMeta]);
-
-  const questions = displayModule?.questions || [];
+  const questions = module?.questions || [];
   const q = questions[idx];
 
   // beforeunload guard — warns if user tries to close tab/refresh mid-session
@@ -108,7 +106,17 @@ export function TestScreen({ moduleId, onExit, onDone }: Props) {
     return [...pairs.map((p: any) => p.right)].sort((a: string, b: string) => a.localeCompare(b));
   }, [q?.id]);
 
-  if (isLoading || !moduleMeta) return (
+  if (sessionError) return (
+    <div style={{ display: "grid", placeItems: "center", height: "100vh", padding: 24 }}>
+      <div style={{ textAlign: "center", maxWidth: 380 }}>
+        <p className="serif" style={{ fontSize: 22, margin: "0 0 8px" }}>Can't start this module</p>
+        <p style={{ color: "var(--ink-2)", margin: "0 0 20px" }}>{sessionError}</p>
+        <button className="btn ghost" onClick={onExit}>Go back</button>
+      </div>
+    </div>
+  );
+
+  if (!sessionId || isLoading || !module) return (
     <div style={{ display: "grid", placeItems: "center", height: "100vh" }}>
       <div className="dot-load"><i /><i /><i /></div>
     </div>
@@ -145,63 +153,87 @@ export function TestScreen({ moduleId, onExit, onDone }: Props) {
     setMatchSel(null);
   }
 
+  function buildSelection(): Record<string, string> {
+    if (q.kind === "match") return { ...matchPairs };
+    if (q.kind === "fill") return { choice: choices.length > 0 ? selected! : fillInput.trim() };
+    return { choice: selected! };
+  }
+
   async function submit() {
-    if (!sessionId) return;
-    let selection: Record<string, string>;
-    if (q.kind === "match") {
-      selection = { ...matchPairs };
-    } else if (q.kind === "fill") {
-      // fill with word-bank choices uses selected; fill with free-text uses fillInput
-      selection = { choice: choices.length > 0 ? selected! : fillInput.trim() };
-    } else {
-      selection = { choice: selected! };
-    }
+    if (!sessionId || !q) return;
+
+    const selection = buildSelection();
     const timeMs = Date.now() - qStartRef.current;
     const meta = proctoringMeta[q.id] ?? { tab_switch: false, face_anomaly: false };
-    let is_correct = false;
-    try {
-      const res = await api.sessions.answer(sessionId, {
-        question_id: q.id,
-        selection,
-        time_spent_ms: timeMs,
-        tab_switch: meta.tab_switch,
-        face_anomaly: meta.face_anomaly,
-      });
-      is_correct = res?.is_correct ?? false;
-    } catch {}
+    const answerPayload = {
+      question_id: q.id,
+      selection,
+      time_spent_ms: timeMs,
+      tab_switch: meta.tab_switch,
+      face_anomaly: meta.face_anomaly,
+    };
 
-    const correctAnswer = q.payload?.answer || "";
-    const nextAnswers = [...answers, {
+    const localAnswer = {
       questionId: q.id,
       selection,
-      is_correct,
+      is_correct: false, // updated when API responds
       prompt: q.prompt,
-      correct_answer: correctAnswer,
-    }];
-    setAnswers(nextAnswers);
+      correct_answer: q.payload?.answer || "",
+    };
+
+    // Append to both ref (source of truth) and state (for UI)
+    answersRef.current = [...answersRef.current, localAnswer];
+    setAnswers([...answersRef.current]);
 
     if (last) {
+      // For the final question: wait for all background saves, then save last + finish
+      setFinishing(true);
       try {
+        await Promise.allSettled(pendingRef.current);
+        pendingRef.current = [];
+
+        const res = await api.sessions.answer(sessionId, answerPayload);
+        // Update last answer's is_correct in the ref
+        const qId = q.id;
+        answersRef.current = answersRef.current.map((a) =>
+          a.questionId === qId ? { ...a, is_correct: res?.is_correct ?? false } : a
+        );
+
         const result = await api.sessions.finish(sessionId, {
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           tab_switch_count: tabSwitchCount,
           face_anomaly_count: faceAnomalyCount,
         });
         api.sessions.logEvent(sessionId, "close").catch(() => {});
-        if (camRef.current) {
-          await camRef.current.stopAndUpload(sessionId);
-        }
-        onDone({ ...result, session_id: sessionId, module_id: moduleId, answers: nextAnswers, timeMs: Date.now() - startRef.current });
+        if (camRef.current) await camRef.current.stopAndUpload(sessionId);
+        onDone({
+          ...result,
+          session_id: sessionId,
+          module_id: moduleId,
+          answers: answersRef.current,
+          timeMs: Date.now() - startRef.current,
+        });
       } catch {
-        if (camRef.current) {
-          await camRef.current.stopAndUpload(sessionId).catch(() => {});
-        }
-        onDone({ score_pct: 0, session_id: sessionId, module_id: moduleId, answers: nextAnswers, timeMs: 0 });
+        if (camRef.current) await camRef.current.stopAndUpload(sessionId).catch(() => {});
+        onDone({ score_pct: 0, session_id: sessionId, module_id: moduleId, answers: answersRef.current, timeMs: 0 });
       }
       return;
     }
+
+    // Non-last question: advance immediately (optimistic), save in background
     setIdx((i) => i + 1);
     resetQ();
+
+    const capturedQId = q.id;
+    const p = api.sessions.answer(sessionId, answerPayload)
+      .then((res) => {
+        answersRef.current = answersRef.current.map((a) =>
+          a.questionId === capturedQId ? { ...a, is_correct: res?.is_correct ?? false } : a
+        );
+        setAnswers([...answersRef.current]);
+      })
+      .catch(() => {});
+    pendingRef.current.push(p);
   }
 
   const choices = q.payload?.choices || [];
@@ -249,7 +281,7 @@ export function TestScreen({ moduleId, onExit, onDone }: Props) {
             </blockquote>
           )}
 
-          {q.kind === "listen_choice" && displayModule?.audio_blob && (
+          {q.kind === "listen_choice" && module?.audio_blob && (
             <AudioPlayer src={`/api/v1/modules/${moduleId}/audio`} />
           )}
 
@@ -341,7 +373,7 @@ export function TestScreen({ moduleId, onExit, onDone }: Props) {
           }}>
             <p className="serif" style={{ margin: "0 0 8px", fontSize: 22, letterSpacing: "-0.015em" }}>Exit this session?</p>
             <p style={{ margin: "0 0 24px", color: "var(--ink-2)", fontSize: 14, lineHeight: 1.5 }}>
-              Your progress so far has been saved. You can come back and retry this module at any time.
+              Your progress ({answers.length} of {questions.length} answered) will be saved to your history.
             </p>
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
               <button className="btn ghost" onClick={() => setExitDialog(false)}>Keep going</button>
@@ -349,16 +381,41 @@ export function TestScreen({ moduleId, onExit, onDone }: Props) {
                 onClick={async () => {
                   setExitDialog(false);
                   if (sessionId) {
-                    await api.sessions.logEvent(sessionId, "interrupt", {
+                    try {
+                      // Save any background answers, then finish the session
+                      await Promise.allSettled(pendingRef.current);
+                      await api.sessions.finish(sessionId, {
+                        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                        tab_switch_count: tabSwitchCount,
+                        face_anomaly_count: faceAnomalyCount,
+                      });
+                    } catch {}
+                    api.sessions.logEvent(sessionId, "interrupt", {
                       question_idx: idx,
                       answers_submitted: answers.length,
                     }).catch(() => {});
                   }
                   onExit();
                 }}>
-                Exit session
+                Exit & save
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {finishing && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200,
+          display: "grid", placeItems: "center",
+        }}>
+          <div style={{
+            background: "var(--surface)", border: "1px solid var(--line)", borderRadius: "var(--r-xl)",
+            padding: "40px 48px", textAlign: "center", boxShadow: "var(--shadow-md)",
+          }}>
+            <div className="dot-load"><i /><i /><i /></div>
+            <p className="serif" style={{ margin: "18px 0 4px", fontSize: 20, letterSpacing: "-0.015em" }}>Finalizing your score…</p>
+            <p style={{ margin: 0, color: "var(--ink-3)", fontSize: 13 }}>Just a moment</p>
           </div>
         </div>
       )}

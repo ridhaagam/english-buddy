@@ -188,6 +188,7 @@ export function ProfileScreen({ user, onStartTest, onNav }: Props) {
         .link-btn:hover { color:var(--ink); }
         @media(max-width:920px) { .hero{grid-template-columns:1fr;align-items:start} .hero-right{align-items:stretch} .stat-grid{grid-template-columns:repeat(2,1fr)} .lower{grid-template-columns:1fr} }
         @media(max-width:520px) { .stat-grid{grid-template-columns:1fr 1fr} .stat-val{font-size:26px} }
+        @media(max-width:480px) { .hero h1.serif{font-size:28px!important} }
       `}</style>
     </div>
   );

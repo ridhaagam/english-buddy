@@ -50,6 +50,7 @@ class ModuleOut(BaseModel):
     is_closed: bool = False
     max_attempts: int | None = None
     reveal_at: str | None = None
+    show_answers_after_deadline: bool = True
 
 
 class ModuleSettingsBody(BaseModel):
@@ -106,6 +107,7 @@ async def list_all_modules(
             is_closed=m.is_closed,
             max_attempts=m.max_attempts,
             reveal_at=m.reveal_at.isoformat() if m.reveal_at else None,
+            show_answers_after_deadline=m.show_answers_after_deadline,
         ))
     return out
 
@@ -259,8 +261,16 @@ async def get_module_detail(
         "topic": m.topic.value,
         "cefr_level": m.cefr_level.value,
         "status": m.status.value,
+        "description": m.description,
+        "source_kind": m.source_kind.value,
         "audio_blob": m.audio_blob,
         "audio_duration_seconds": m.audio_duration_seconds,
+        # Settings fields — needed by the frontend edit drawer
+        "deadline": m.deadline.isoformat() if m.deadline else None,
+        "is_closed": m.is_closed,
+        "max_attempts": m.max_attempts,
+        "reveal_at": m.reveal_at.isoformat() if m.reveal_at else None,
+        "show_answers_after_deadline": m.show_answers_after_deadline,
         "questions": [
             {
                 "id": str(q.id),

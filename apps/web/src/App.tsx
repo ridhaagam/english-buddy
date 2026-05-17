@@ -11,7 +11,7 @@ import { AdminDashboard } from "./features/admin/dashboard/AdminDashboard";
 import { AdminModules } from "./features/admin/modules/AdminModules";
 import { AdminImport } from "./features/admin/import-doc/AdminImport";
 import { AdminListening } from "./features/admin/import-audio/AdminListening";
-import { AdminRecordings } from "./features/admin/recordings/AdminRecordings";
+import { AdminResults } from "./features/admin/recordings/AdminRecordings";
 import { AdminReports } from "./features/admin/reports/AdminReports";
 import { AdminUsers } from "./features/admin/users/AdminUsers";
 import { AdminAuditLog } from "./features/admin/audit-log/AdminAuditLog";
@@ -114,7 +114,7 @@ export function App() {
             case "modules": return <AdminModules />;
             case "import-doc": return <AdminImport />;
             case "import-audio": return <AdminListening />;
-            case "recordings": return <AdminRecordings />;
+            case "results": return <AdminResults />;
             case "reports": return <AdminReports />;
             case "users": return <AdminUsers />;
             case "audit-log": return isOwner ? <AdminAuditLog /> : <AdminDashboard />;

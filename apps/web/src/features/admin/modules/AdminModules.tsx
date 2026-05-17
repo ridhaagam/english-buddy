@@ -6,7 +6,7 @@ import { api } from "../../../lib/api";
 const TOPICS = ["vocabulary", "grammar", "listening", "speaking", "writing"];
 const CEFR = ["A1", "A2", "B1", "B2", "C1", "C2"];
 
-type Q = { id?: string; kind: string; prompt: string; payload: any };
+type Q = { id?: string; kind: string; prompt: string; context?: string | null; sentence?: string | null; explain?: string | null; payload: any };
 type ModuleForm = {
   title: string; topic: string; cefr_level: string; description: string;
   source_kind: string; status: string; questions: Q[];
@@ -19,8 +19,8 @@ const blank: ModuleForm = {
   title: "", topic: "vocabulary", cefr_level: "B1", description: "",
   source_kind: "manual", status: "draft", questions: [],
 };
-const blankSettings: Settings = { deadline: "", is_closed: false, max_attempts: "", show_answers_after_deadline: true, reveal_at: "" };
-const blankQ: Q = { kind: "choice", prompt: "", payload: { choices: [], answer: "" } };
+const blankSettings: Settings = { deadline: "", is_closed: false, max_attempts: "", show_answers_after_deadline: false, reveal_at: "" };
+const blankQ: Q = { kind: "choice", prompt: "", context: null, sentence: null, explain: null, payload: { choices: [], answer: "" } };
 
 export function AdminModules() {
   const qc = useQueryClient();
@@ -30,6 +30,7 @@ export function AdminModules() {
   });
 
   const [open, setOpen] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [form, setForm] = useState<ModuleForm>(blank);
   const [settings, setSettings] = useState<Settings>(blankSettings);
@@ -38,12 +39,13 @@ export function AdminModules() {
 
   function openNew() { setEditing(null); setForm(blank); setSettings(blankSettings); setQIdx(null); setOpen(true); }
 
-  function openEdit(m: any) {
+  async function openEdit(m: any) {
+    // Open the drawer immediately with basic metadata so it feels instant
     setEditing(m);
     setForm({
       title: m.title, topic: m.topic, cefr_level: m.cefr_level,
       description: m.description || "", source_kind: m.source_kind || "manual",
-      status: m.status, questions: m.questions || [],
+      status: m.status, questions: [],
     });
     setSettings({
       deadline: m.deadline ? m.deadline.slice(0, 16) : "",
@@ -54,9 +56,44 @@ export function AdminModules() {
     });
     setQIdx(null);
     setOpen(true);
+    setDetailLoading(true);
+    try {
+      // Fetch full detail to get questions and canonical settings
+      const detail = await api.admin.modules.get(m.id);
+      setForm((f) => ({
+        ...f,
+        title: detail.title,
+        topic: detail.topic,
+        cefr_level: detail.cefr_level,
+        description: detail.description || "",
+        source_kind: detail.source_kind || "manual",
+        status: detail.status,
+        questions: (detail.questions || []).map((q: any) => ({
+          id: q.id,
+          kind: q.kind,
+          prompt: q.prompt,
+          context: q.context ?? null,
+          sentence: q.sentence ?? null,
+          explain: q.explain ?? null,
+          payload: q.payload ?? {},
+        })),
+      }));
+      // Update settings from detail (has all fields)
+      setSettings({
+        deadline: detail.deadline ? detail.deadline.slice(0, 16) : "",
+        is_closed: detail.is_closed || false,
+        max_attempts: detail.max_attempts != null ? String(detail.max_attempts) : "",
+        show_answers_after_deadline: detail.show_answers_after_deadline !== false,
+        reveal_at: detail.reveal_at ? detail.reveal_at.slice(0, 16) : "",
+      });
+    } catch (err: any) {
+      alert("Failed to load module details: " + (err.message || "unknown error"));
+    } finally {
+      setDetailLoading(false);
+    }
   }
 
-  function closeDrawer() { setOpen(false); setEditing(null); setForm(blank); setSettings(blankSettings); setQIdx(null); }
+  function closeDrawer() { setOpen(false); setEditing(null); setForm(blank); setSettings(blankSettings); setQIdx(null); setDetailLoading(false); }
   function setF(k: keyof ModuleForm, v: any) { setForm((f) => ({ ...f, [k]: v })); }
   function setS(k: keyof Settings, v: any) { setSettings((s) => ({ ...s, [k]: v })); }
 
@@ -132,7 +169,7 @@ export function AdminModules() {
 
       {isLoading && <div style={{ color: "var(--ink-3)" }}>Loading…</div>}
 
-      <div className="card" style={{ overflow: "hidden" }}>
+      <div className="card" style={{ overflowX: "auto" }}>
         <table className="adm-table" style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ borderBottom: "1px solid var(--line)" }}>
@@ -144,16 +181,16 @@ export function AdminModules() {
           <tbody>
             {(modules as any[]).map((m: any) => (
               <tr key={m.id} style={{ borderBottom: "1px solid var(--line-2)" }}>
-                <td style={tdStyle}><span style={{ fontWeight: 600 }}>{m.title}</span></td>
-                <td style={tdStyle}><span className="mono" style={{ fontSize: 11, textTransform: "capitalize", padding: "3px 8px", borderRadius: 999, background: "var(--bg-2)", color: "var(--ink-2)", border: "1px solid var(--line)" }}>{m.topic}</span></td>
-                <td style={tdStyle}><span className="mono" style={{ fontSize: 12 }}>{m.cefr_level}</span></td>
-                <td style={tdStyle}>{m.questions_count ?? 0}</td>
-                <td style={tdStyle}>
+                <td data-label="Title" style={tdStyle}><span style={{ fontWeight: 600 }}>{m.title}</span></td>
+                <td data-label="Topic" style={tdStyle}><span className="mono" style={{ fontSize: 11, textTransform: "capitalize", padding: "3px 8px", borderRadius: 999, background: "var(--bg-2)", color: "var(--ink-2)", border: "1px solid var(--line)" }}>{m.topic}</span></td>
+                <td data-label="Level" style={tdStyle}><span className="mono" style={{ fontSize: 12 }}>{m.cefr_level}</span></td>
+                <td data-label="Questions" style={tdStyle}>{m.questions_count ?? 0}</td>
+                <td data-label="Status" style={tdStyle}>
                   <span className="mono" style={{ fontSize: 11, padding: "3px 8px", borderRadius: 999, background: m.status === "published" ? "var(--accent-soft)" : "var(--bg-2)", color: m.status === "published" ? "var(--accent-ink)" : "var(--ink-3)", border: "1px solid var(--line)" }}>
                     {m.status}
                   </span>
                 </td>
-                <td style={tdStyle}>
+                <td data-label="Access" style={tdStyle}>
                   <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                     {m.is_closed && (
                       <span className="mono" style={{ fontSize: 10, padding: "2px 6px", borderRadius: 999, background: "oklch(0.93 0.06 25)", color: "oklch(0.45 0.1 25)", border: "1px solid oklch(0.85 0.06 25)" }}>CLOSED</span>
@@ -200,6 +237,12 @@ export function AdminModules() {
             </div>
 
             <div className="drawer-body">
+              {detailLoading && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 0 14px", color: "var(--ink-3)", fontSize: 13 }}>
+                  <div className="dot-load" style={{ transform: "scale(0.7)" }}><i /><i /><i /></div>
+                  Loading questions…
+                </div>
+              )}
               <div className="drawer-cols">
                 <div className="drawer-left">
                   <div className="field">
@@ -246,7 +289,7 @@ export function AdminModules() {
                         <input type="datetime-local" value={settings.reveal_at}
                           onChange={(e) => setS("reveal_at", e.target.value)}
                           style={{ fontSize: 13 }} />
-                        <span style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 3 }}>Leave blank to reveal immediately after submission.</span>
+                        <span style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 3 }}>Leave blank and check "Reveal answers" to show results immediately. Set a date to reveal after that time.</span>
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
@@ -258,7 +301,7 @@ export function AdminModules() {
                       <label style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13, cursor: "pointer" }}>
                         <input type="checkbox" checked={settings.show_answers_after_deadline}
                           onChange={(e) => setS("show_answers_after_deadline", e.target.checked)} />
-                        Show answers after deadline
+                        Reveal answers to learners
                       </label>
                     </div>
                   </div>
@@ -276,7 +319,7 @@ export function AdminModules() {
                         <button className="icon-btn" style={{ opacity: 0.5 }} onClick={(e) => { e.stopPropagation(); delQ(i); }}><TrashIcon size={12} /></button>
                       </div>
                     ))}
-                    {form.questions.length === 0 && <p style={{ color: "var(--ink-3)", fontSize: 13, textAlign: "center", padding: "16px 0" }}>No questions yet.</p>}
+                    {form.questions.length === 0 && !detailLoading && <p style={{ color: "var(--ink-3)", fontSize: 13, textAlign: "center", padding: "16px 0" }}>No questions yet.</p>}
                   </div>
                 </div>
 
@@ -287,7 +330,7 @@ export function AdminModules() {
                       <label>Type</label>
                       <select value={curQ.kind} onChange={(e) => {
                         const kind = e.target.value;
-                        const payload = kind === "match" ? { pairs: [] } : kind === "fill" ? { sentence: "", choices: [], answer: "" } : { choices: [], answer: "" };
+                        const payload = kind === "match" ? { pairs: [] } : kind === "fill" ? { sentence: curQ.sentence || "", choices: [], answer: "" } : { choices: [], answer: "" };
                         setQ(qIdx, "kind", kind);
                         setQPayload(qIdx, payload);
                       }}>
@@ -313,8 +356,8 @@ export function AdminModules() {
 
             <div className="drawer-foot">
               <button className="btn ghost" onClick={closeDrawer}>Cancel</button>
-              <button className="btn accent" disabled={saving} onClick={handleSave}>
-                {saving ? "Saving…" : "Save module"} <ArrowRightIcon size={14} />
+              <button className="btn accent" disabled={saving || detailLoading} onClick={handleSave}>
+                {saving ? "Saving…" : detailLoading ? "Loading…" : "Save module"} <ArrowRightIcon size={14} />
               </button>
             </div>
           </div>

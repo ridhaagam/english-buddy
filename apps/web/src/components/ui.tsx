@@ -207,57 +207,75 @@ export function Topbar({ route, onNav, user, onLogout, onOpenAdmin }: TopbarProp
   }, [dropOpen]);
 
   return (
-    <header className="topbar">
-      <Logo />
-      {user && (
-        <>
-          <nav>
-            <button aria-current={route === "profile" ? "true" : undefined} onClick={() => onNav("profile")}>Dashboard</button>
-            <button aria-current={route === "practice" ? "true" : undefined} onClick={() => onNav("practice")}>Practice</button>
-            <button aria-current={route === "library" ? "true" : undefined} onClick={() => onNav("library")}>Library</button>
-          </nav>
-          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            {onOpenAdmin && (
-              <button className="admin-pill" onClick={onOpenAdmin}>
-                <ShieldIcon /> Admin
-              </button>
-            )}
-            <span className="mono" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--ink-2)", background: "var(--amber-soft)", padding: "6px 10px", borderRadius: 999 }}>
-              <FlameIcon size={12} /> {user.streak}d
-            </span>
-            {/* Avatar dropdown */}
-            <div ref={dropRef} style={{ position: "relative" }}>
-              <button
-                aria-label="Profile menu"
-                onClick={() => setDropOpen((v) => !v)}
-                style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: 6 }}>
-                <Avatar name={user.display_name} avatarUrl={user.avatar_url} />
-                <ChevronDownIcon size={14} />
-              </button>
-              {dropOpen && (
-                <div style={{
-                  position: "absolute", right: 0, top: "calc(100% + 8px)", background: "var(--bg)", border: "1px solid var(--line)", borderRadius: "var(--r-md)",
-                  boxShadow: "var(--shadow-lg)", minWidth: 180, zIndex: 300, overflow: "hidden",
-                }}>
-                  <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--line-2)" }}>
-                    <p style={{ margin: 0, fontWeight: 600, fontSize: 13 }}>{user.display_name}</p>
-                    <p style={{ margin: 0, fontSize: 11, color: "var(--ink-3)", textTransform: "capitalize" }}>{user.role}</p>
-                  </div>
-                  <button onClick={() => { setDropOpen(false); onNav("profile-edit"); }}
-                    style={{ width: "100%", padding: "10px 14px", textAlign: "left", background: "none", border: "none", cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", gap: 8, color: "var(--ink)" }}>
-                    <GearIcon size={14} /> Edit profile
-                  </button>
-                  <button onClick={() => { setDropOpen(false); onLogout?.(); }}
-                    style={{ width: "100%", padding: "10px 14px", textAlign: "left", background: "none", border: "none", cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", gap: 8, color: "oklch(0.5 0.1 25)" }}>
-                    <LogOutIcon size={14} /> Sign out
-                  </button>
-                </div>
+    <>
+      <header className="topbar">
+        <Logo />
+        {user && (
+          <>
+            <nav>
+              <button aria-current={route === "profile" ? "true" : undefined} onClick={() => onNav("profile")}>Dashboard</button>
+              <button aria-current={route === "practice" ? "true" : undefined} onClick={() => onNav("practice")}>Practice</button>
+              <button aria-current={route === "library" ? "true" : undefined} onClick={() => onNav("library")}>Library</button>
+            </nav>
+            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              {onOpenAdmin && (
+                <button className="admin-pill" onClick={onOpenAdmin}>
+                  <ShieldIcon /> Admin
+                </button>
               )}
+              <span className="mono" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--ink-2)", background: "var(--amber-soft)", padding: "6px 10px", borderRadius: 999 }}>
+                <FlameIcon size={12} /> {user.streak}d
+              </span>
+              {/* Avatar dropdown */}
+              <div ref={dropRef} style={{ position: "relative" }}>
+                <button
+                  aria-label="Profile menu"
+                  onClick={() => setDropOpen((v) => !v)}
+                  style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: 6 }}>
+                  <Avatar name={user.display_name} avatarUrl={user.avatar_url} />
+                  <ChevronDownIcon size={14} />
+                </button>
+                {dropOpen && (
+                  <div style={{
+                    position: "absolute", right: 0, top: "calc(100% + 8px)", background: "var(--bg)", border: "1px solid var(--line)", borderRadius: "var(--r-md)",
+                    boxShadow: "var(--shadow-lg)", minWidth: "min(180px, calc(100vw - 32px))", zIndex: 300, overflow: "hidden",
+                  }}>
+                    <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--line-2)" }}>
+                      <p style={{ margin: 0, fontWeight: 600, fontSize: 13 }}>{user.display_name}</p>
+                      <p style={{ margin: 0, fontSize: 11, color: "var(--ink-3)", textTransform: "capitalize" }}>{user.role}</p>
+                    </div>
+                    <button onClick={() => { setDropOpen(false); onNav("profile-edit"); }}
+                      style={{ width: "100%", padding: "10px 14px", textAlign: "left", background: "none", border: "none", cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", gap: 8, color: "var(--ink)" }}>
+                      <GearIcon size={14} /> Edit profile
+                    </button>
+                    <button onClick={() => { setDropOpen(false); onLogout?.(); }}
+                      style={{ width: "100%", padding: "10px 14px", textAlign: "left", background: "none", border: "none", cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", gap: 8, color: "oklch(0.5 0.1 25)" }}>
+                      <LogOutIcon size={14} /> Sign out
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        </>
+          </>
+        )}
+      </header>
+      {user && (
+        <nav className="bottom-nav" aria-label="Main navigation">
+          <button className={route === "profile" ? "active" : ""} onClick={() => onNav("profile")}>
+            <HomeIcon size={18} />
+            Dashboard
+          </button>
+          <button className={route === "practice" ? "active" : ""} onClick={() => onNav("practice")}>
+            <BookOpenIcon size={18} />
+            Practice
+          </button>
+          <button className={route === "library" ? "active" : ""} onClick={() => onNav("library")}>
+            <CompassIcon size={18} />
+            Library
+          </button>
+        </nav>
       )}
-    </header>
+    </>
   );
 }
 

@@ -35,7 +35,7 @@ export function PracticeScreen({ onStartTest, onViewSession }: Props) {
       )}
 
       {sessions.length > 0 && (
-        <div className="card" style={{ overflow: "hidden" }}>
+        <div className="card" style={{ overflowX: "auto" }}>
           <table className="adm-table" style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ borderBottom: "1px solid var(--line)" }}>

@@ -116,6 +116,7 @@ export function LibraryScreen({ onStartTest }: Props) {
         .hs-empty { padding:10px 12px; background:var(--bg-2); border-radius:var(--r-sm); display:flex; flex-direction:column; gap:2px; }
         .tile-action { margin-top:auto; width:100%; }
         @media(max-width:720px) { .lib-head{grid-template-columns:1fr} .lib-grid{grid-template-columns:1fr} }
+        @media(max-width:480px) { .lib-stats{grid-template-columns:1fr} }
       `}</style>
     </div>
   );

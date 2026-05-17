@@ -179,10 +179,23 @@ async def get_my_session(
     mod_r = await db.execute(select(Module).where(Module.id == session.module_id))
     module = mod_r.scalar_one_or_none()
 
-    # Answers are revealed only after reveal_at (if set); otherwise always visible
-    answers_revealed = True
-    if module and module.reveal_at:
-        answers_revealed = datetime.now(timezone.utc) >= module.reveal_at
+    # Determine reveal state. Default is HIDDEN.
+    # Revealed when:
+    #   a) reveal_at is set and has already passed (time-gated reveal)
+    #   b) show_answers_after_deadline=True and deadline is set and has passed
+    #   c) show_answers_after_deadline=True and NO deadline/reveal_at (admin chose "reveal immediately")
+    answers_revealed = False
+    effective_reveal_at = None
+    if module:
+        if module.reveal_at:
+            effective_reveal_at = module.reveal_at
+            answers_revealed = datetime.now(timezone.utc) >= module.reveal_at
+        elif module.show_answers_after_deadline and module.deadline:
+            effective_reveal_at = module.deadline
+            answers_revealed = datetime.now(timezone.utc) >= module.deadline
+        elif module.show_answers_after_deadline and not module.deadline:
+            # No time gate — admin chose immediate reveal
+            answers_revealed = True
 
     ans_r = await db.execute(
         select(SessionAnswer).where(SessionAnswer.session_id == session_id)
@@ -194,12 +207,12 @@ async def get_my_session(
     )
     questions = {str(q.id): q for q in qs_r.scalars().all()}
 
-    def _safe_payload(a: SessionAnswer, q) -> dict:
+    def _public_payload(a: SessionAnswer, q) -> dict:
         if not q:
             return {}
         payload = dict(q.payload)
-        # Strip correct answer if reveal_at hasn't passed yet, or if admin-flagged
-        if not answers_revealed or (a.flagged and a.admin_comment):
+        # Only strip the correct answer key if results are still hidden
+        if not answers_revealed:
             payload.pop("answer", None)
         return payload
 
@@ -207,7 +220,7 @@ async def get_my_session(
         "id": str(session.id),
         "module_id": str(session.module_id),
         "module_title": module.title if module else "",
-        "reveal_at": module.reveal_at.isoformat() if module and module.reveal_at else None,
+        "reveal_at": effective_reveal_at.isoformat() if effective_reveal_at else None,
         "answers_revealed": answers_revealed,
         "score_pct": session.score_pct if answers_revealed else None,
         "correct_count": session.correct_count if answers_revealed else None,
@@ -220,7 +233,9 @@ async def get_my_session(
         "answers": [
             {
                 "question_id": str(a.question_id),
-                "selection": a.selection if answers_revealed else None,
+                # selection is always returned — it's the user's own answer
+                "selection": a.selection,
+                # is_correct is gated until answers are revealed
                 "is_correct": a.is_correct if answers_revealed else None,
                 "time_spent_ms": a.time_spent_ms,
                 "flagged": a.flagged,
@@ -229,7 +244,7 @@ async def get_my_session(
                 "face_anomaly": a.face_anomaly,
                 "question_prompt": questions[str(a.question_id)].prompt if str(a.question_id) in questions else "",
                 "kind": questions[str(a.question_id)].kind.value if str(a.question_id) in questions else "",
-                "payload": _safe_payload(a, questions.get(str(a.question_id))),
+                "payload": _public_payload(a, questions.get(str(a.question_id))),
             }
             for a in answers
         ],

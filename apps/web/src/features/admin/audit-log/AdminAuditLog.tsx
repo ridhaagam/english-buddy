@@ -39,8 +39,8 @@ export function AdminAuditLog() {
 
       {isLoading && <div style={{ color: "var(--ink-3)" }}>Loading…</div>}
 
-      <div className="card" style={{ overflow: "hidden" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <div className="card" style={{ overflowX: "auto" }}>
+        <table className="adm-table" style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ borderBottom: "1px solid var(--line)" }}>
               {["Time", "Actor", "Action", "Target", "Details"].map((h) => (
@@ -53,23 +53,23 @@ export function AdminAuditLog() {
               const hue = ACTION_COLOR[e.action] ?? "158";
               return (
                 <tr key={e.id} style={{ borderBottom: "1px solid var(--line-2)" }}>
-                  <td style={{ ...tdStyle, color: "var(--ink-3)", fontSize: 12, whiteSpace: "nowrap" }}>
+                  <td data-label="Time" style={{ ...tdStyle, color: "var(--ink-3)", fontSize: 12, whiteSpace: "nowrap" }}>
                     {new Date(e.at).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })}
                   </td>
-                  <td style={tdStyle}>
+                  <td data-label="Actor" style={tdStyle}>
                     <span style={{ fontWeight: 600, fontSize: 13 }}>{e.actor_name}</span>
                     {e.actor_email && <div style={{ fontSize: 11, color: "var(--ink-3)" }}>{e.actor_email}</div>}
                   </td>
-                  <td style={tdStyle}>
+                  <td data-label="Action" style={tdStyle}>
                     <span className="mono" style={{ fontSize: 11, padding: "3px 8px", borderRadius: 999, background: `oklch(0.95 0.04 ${hue})`, color: `oklch(0.4 0.1 ${hue})`, border: `1px solid oklch(0.85 0.06 ${hue})` }}>
                       {ACTION_LABEL[e.action] ?? e.action}
                     </span>
                   </td>
-                  <td style={{ ...tdStyle, fontSize: 12, color: "var(--ink-2)" }}>
+                  <td data-label="Target" style={{ ...tdStyle, fontSize: 12, color: "var(--ink-2)" }}>
                     {e.target_kind && <span className="mono" style={{ fontSize: 10, marginRight: 4, color: "var(--ink-3)" }}>{e.target_kind}</span>}
                     {e.target_id ? e.target_id.slice(0, 8) + "…" : "—"}
                   </td>
-                  <td style={{ ...tdStyle, fontSize: 12, color: "var(--ink-3)", maxWidth: 260 }}>
+                  <td data-label="Details" style={{ ...tdStyle, fontSize: 12, color: "var(--ink-3)", maxWidth: 260 }}>
                     {e.payload ? (
                       <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, wordBreak: "break-word" }}>
                         {Object.entries(e.payload).map(([k, v]) => `${k}: ${v}`).join(" · ")}

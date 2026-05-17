@@ -61,7 +61,7 @@ function StaffTab() {
 
       {isLoading && <div style={{ color: "var(--ink-3)" }}>Loading…</div>}
 
-      <div className="card" style={{ overflow: "hidden" }}>
+      <div className="card" style={{ overflowX: "auto" }}>
         <table className="adm-table" style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ borderBottom: "1px solid var(--line)" }}>
@@ -73,17 +73,17 @@ function StaffTab() {
           <tbody>
             {(users as any[]).map((u: any) => (
               <tr key={u.id} style={{ borderBottom: "1px solid var(--line-2)" }}>
-                <td style={tdStyle}><span style={{ fontWeight: 600 }}>{u.display_name}</span></td>
-                <td style={{ ...tdStyle, color: "var(--ink-2)" }}>{u.email}</td>
-                <td style={tdStyle}>
+                <td data-label="Name" style={tdStyle}><span style={{ fontWeight: 600 }}>{u.display_name}</span></td>
+                <td data-label="Email" style={{ ...tdStyle, color: "var(--ink-2)" }}>{u.email}</td>
+                <td data-label="Role" style={tdStyle}>
                   <select className="mono" value={u.role}
                     onChange={(e) => changeRole.mutate({ id: u.id, role: e.target.value })}
                     style={{ fontSize: 11, padding: "3px 8px", borderRadius: 999, background: `oklch(0.95 0.04 ${roleColors[u.role] || "158"})`, color: `oklch(0.4 0.1 ${roleColors[u.role] || "158"})`, border: `1px solid oklch(0.85 0.06 ${roleColors[u.role] || "158"})`, cursor: "pointer" }}>
                     {STAFF_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
                   </select>
                 </td>
-                <td style={{ ...tdStyle, color: "var(--ink-3)", fontSize: 13 }}>{u.created_at ? new Date(u.created_at).toLocaleDateString() : "—"}</td>
-                <td style={tdStyle}><span className="mono" style={{ fontSize: 12, color: "var(--accent-ink)" }}>{(u.xp_total ?? 0).toLocaleString()}</span></td>
+                <td data-label="Joined" style={{ ...tdStyle, color: "var(--ink-3)", fontSize: 13 }}>{u.created_at ? new Date(u.created_at).toLocaleDateString() : "—"}</td>
+                <td data-label="XP" style={tdStyle}><span className="mono" style={{ fontSize: 12, color: "var(--accent-ink)" }}>{(u.xp_total ?? 0).toLocaleString()}</span></td>
                 <td style={{ ...tdStyle, textAlign: "right" }}>
                   <button className="icon-btn" onClick={() => { if (confirm(`Delete ${u.display_name}?`)) del.mutate(u.id); }}>
                     <TrashIcon size={14} />
@@ -164,7 +164,7 @@ function LearnersTab() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by name or email…"
-          style={{ flex: 1, maxWidth: 340, padding: "8px 12px", borderRadius: "var(--r-sm)", border: "1px solid var(--line)", background: "var(--bg-2)", fontSize: 13 }}
+          style={{ flex: 1, minWidth: 0, padding: "8px 12px", borderRadius: "var(--r-sm)", border: "1px solid var(--line)", background: "var(--bg-2)", fontSize: 13 }}
         />
         <button className="btn accent" onClick={() => setOpen(true)}>
           <PlusIcon size={14} /> Add learner
@@ -173,7 +173,7 @@ function LearnersTab() {
 
       {isLoading && <div style={{ color: "var(--ink-3)" }}>Loading…</div>}
 
-      <div className="card" style={{ overflow: "hidden" }}>
+      <div className="card" style={{ overflowX: "auto" }}>
         <table className="adm-table" style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ borderBottom: "1px solid var(--line)" }}>
@@ -185,13 +185,13 @@ function LearnersTab() {
           <tbody>
             {(learners as any[]).map((u: any) => (
               <tr key={u.id} style={{ borderBottom: "1px solid var(--line-2)" }}>
-                <td style={tdStyle}><span style={{ fontWeight: 600 }}>{u.display_name}</span></td>
-                <td style={{ ...tdStyle, color: "var(--ink-2)" }}>{u.email}</td>
-                <td style={tdStyle}><span className="mono" style={{ fontSize: 12 }}>{u.total_sessions ?? 0}</span></td>
-                <td style={{ ...tdStyle, color: "var(--ink-3)", fontSize: 13 }}>
+                <td data-label="Name" style={tdStyle}><span style={{ fontWeight: 600 }}>{u.display_name}</span></td>
+                <td data-label="Email" style={{ ...tdStyle, color: "var(--ink-2)" }}>{u.email}</td>
+                <td data-label="Sessions" style={tdStyle}><span className="mono" style={{ fontSize: 12 }}>{u.total_sessions ?? 0}</span></td>
+                <td data-label="Last active" style={{ ...tdStyle, color: "var(--ink-3)", fontSize: 13 }}>
                   {u.last_active ? new Date(u.last_active).toLocaleDateString() : "Never"}
                 </td>
-                <td style={tdStyle}>
+                <td data-label="Avg score" style={tdStyle}>
                   {u.avg_score != null
                     ? <span className="serif" style={{ fontSize: 16 }}>{Math.round(u.avg_score)}%</span>
                     : <span style={{ color: "var(--ink-3)" }}>—</span>
