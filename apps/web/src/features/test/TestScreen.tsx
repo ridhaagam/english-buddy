@@ -120,11 +120,12 @@ export function TestScreen({ moduleId, onExit, onDone }: Props) {
 
   const matchedRights = new Set(Object.values(matchPairs));
   const allMatched = q.kind === "match" && (q.payload?.pairs || []).every((p: any) => matchPairs[p.left]);
+  // fill with choices: selected word; fill without choices: typed input; else: selected option
   const canSubmit =
     (q.kind === "match" && allMatched) ||
-    (q.kind === "fill" && fillInput.trim().length > 0) ||
-    (q.kind !== "match" && q.kind !== "fill" && selected !== null) ||
-    (q.kind === "listen_choice" && selected !== null);
+    (q.kind === "fill" && choices.length > 0 && selected !== null) ||
+    (q.kind === "fill" && choices.length === 0 && fillInput.trim().length > 0) ||
+    ((q.kind === "choice" || q.kind === "listen_choice") && selected !== null);
 
   function resetQ() {
     setSelected(null);
@@ -150,7 +151,8 @@ export function TestScreen({ moduleId, onExit, onDone }: Props) {
     if (q.kind === "match") {
       selection = { ...matchPairs };
     } else if (q.kind === "fill") {
-      selection = { choice: fillInput.trim() };
+      // fill with word-bank choices uses selected; fill with free-text uses fillInput
+      selection = { choice: choices.length > 0 ? selected! : fillInput.trim() };
     } else {
       selection = { choice: selected! };
     }
@@ -551,9 +553,11 @@ const CameraCapture = forwardRef<
         recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
         recorder.start(5000);
 
-        // Load face-api weights from local public folder (no CDN dependency)
+        // Load face-api weights from local public folder — use WebGL backend for GPU inference
         import("face-api.js").then(async (faceapi) => {
           try {
+            // Explicitly request WebGL (GPU) backend; fall back to CPU if unavailable
+            try { await (faceapi as any).tf.setBackend("webgl"); } catch {}
             await Promise.all([
               faceapi.nets.tinyFaceDetector.loadFromUri("/face-api-weights"),
               faceapi.nets.faceLandmark68Net.loadFromUri("/face-api-weights"),

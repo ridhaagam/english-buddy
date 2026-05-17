@@ -15,6 +15,7 @@ import { AdminRecordings } from "./features/admin/recordings/AdminRecordings";
 import { AdminReports } from "./features/admin/reports/AdminReports";
 import { AdminUsers } from "./features/admin/users/AdminUsers";
 import { AdminAuditLog } from "./features/admin/audit-log/AdminAuditLog";
+import { AdminFaceTest } from "./features/admin/face-test/AdminFaceTest";
 import { ProfileEditPage } from "./features/profile/ProfileEditPage";
 import { SessionDetailPage } from "./features/practice/SessionDetailPage";
 import { api } from "./lib/api";
@@ -117,6 +118,7 @@ export function App() {
             case "reports": return <AdminReports />;
             case "users": return <AdminUsers />;
             case "audit-log": return isOwner ? <AdminAuditLog /> : <AdminDashboard />;
+            case "face-test": return isOwner ? <AdminFaceTest /> : <AdminDashboard />;
             default: return <AdminDashboard />;
           }
         }}

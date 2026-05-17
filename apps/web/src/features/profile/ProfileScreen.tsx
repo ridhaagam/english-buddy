@@ -163,10 +163,10 @@ export function ProfileScreen({ user, onStartTest, onNav }: Props) {
         .hero::before { content:""; position:absolute; right:-120px;top:-80px; width:320px;height:320px; border-radius:50%; background:radial-gradient(closest-side,oklch(0.55 0.12 158/0.18),transparent 70%); pointer-events:none; }
         .hero-right { display:flex; flex-direction:column; align-items:flex-end; gap:14px; z-index:1; }
         .daily-goal { display:flex; flex-direction:column; align-items:center; gap:4px; }
-        .dg-ring { position:relative; width:84px; height:84px; display:grid; place-items:center; flex-shrink:0; }
-        .dg-text { display:flex; flex-direction:column; align-items:center; line-height:1; gap:2px; }
-        .dg-text strong { font-size:20px; letter-spacing:-0.02em; line-height:1; }
-        .dg-text .mono { font-size:10px; color:var(--ink-3); line-height:1; }
+        .dg-ring { position:relative; width:84px; height:84px; flex-shrink:0; }
+        .dg-text { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1; gap:2px; pointer-events:none; }
+        .dg-text strong { font-size:20px; letter-spacing:-0.02em; line-height:1; display:block; }
+        .dg-text .mono { font-size:10px; color:var(--ink-3); line-height:1; display:block; }
         .stat-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:24px; }
         .stat-card { padding:18px 20px; display:flex; flex-direction:column; gap:4px; }
         .stat-val { font-size:32px; letter-spacing:-0.02em; }

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Logo, ShieldIcon, BarChartIcon, BookOpenIcon, MicIcon, VideoIcon, UsersIcon, HomeIcon, ArrowRightIcon, PlusIcon, ImportIcon, FlagIcon } from "../../components/ui";
 
-type AdminRoute = "dashboard" | "modules" | "import-doc" | "import-audio" | "recordings" | "reports" | "users" | "audit-log";
+type AdminRoute = "dashboard" | "modules" | "import-doc" | "import-audio" | "recordings" | "reports" | "users" | "audit-log" | "face-test";
 
 type Props = {
   user: any;
@@ -18,7 +18,8 @@ const NAV_ITEMS: { id: AdminRoute; label: string; icon: React.ReactNode; ownerOn
   { id: "recordings", label: "Recordings", icon: <VideoIcon size={16} /> },
   { id: "reports", label: "Reports", icon: <BarChartIcon size={16} /> },
   { id: "users", label: "Users", icon: <UsersIcon size={16} /> },
-  { id: "audit-log", label: "Audit log", icon: <FlagIcon size={16} />, ownerOnly: true },
+  { id: "audit-log",  label: "Audit log",  icon: <FlagIcon size={16} />, ownerOnly: true },
+  { id: "face-test",  label: "Face test",  icon: <VideoIcon size={16} />, ownerOnly: true },
 ];
 
 export function AdminShell({ user, children, onExitAdmin, isOwner }: Props) {

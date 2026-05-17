@@ -49,9 +49,15 @@ export function AdminRecordings() {
     if (!viewing?.id) return;
     setSavingAnswer(questionId);
     try {
-      await api.admin.recordings.flagAnswer(viewing.id, questionId, answerEdits[questionId] ?? { flagged: false, admin_comment: "" });
+      await api.admin.recordings.flagAnswer(
+        viewing.id,
+        questionId,
+        answerEdits[questionId] ?? { flagged: false, admin_comment: "" },
+      );
       setSavedAnswers((prev) => new Set([...prev, questionId]));
       qc.invalidateQueries({ queryKey: ["admin-recordings"] });
+    } catch {
+      // keep savingAnswer cleared so Save button re-appears on failure
     } finally {
       setSavingAnswer(null);
     }
@@ -280,7 +286,10 @@ export function AdminRecordings() {
                         </span>
                         {qid && (
                           <button
-                            onClick={() => setAnswerEdits((prev) => ({ ...prev, [qid]: { ...(prev[qid] ?? { flagged: false, admin_comment: "" }), flagged: !(edit?.flagged) } }))}
+                            onClick={() => {
+                              setSavedAnswers((prev) => { const s = new Set(prev); s.delete(qid); return s; });
+                              setAnswerEdits((prev) => ({ ...prev, [qid]: { ...(prev[qid] ?? { flagged: false, admin_comment: "" }), flagged: !(edit?.flagged) } }));
+                            }}
                             style={{ fontSize: 10, padding: "2px 7px", borderRadius: 999, border: "1px solid var(--line)", background: edit?.flagged ? "oklch(0.93 0.06 25)" : "var(--bg)", color: edit?.flagged ? "oklch(0.45 0.1 25)" : "var(--ink-3)", cursor: "pointer" }}>
                             <FlagIcon size={10} /> {edit?.flagged ? "Flagged" : "Flag"}
                           </button>
