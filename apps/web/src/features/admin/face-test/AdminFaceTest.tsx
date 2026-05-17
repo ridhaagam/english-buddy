@@ -1,43 +1,59 @@
 import { useEffect, useRef, useState } from "react";
 
-type DetResult = {
-  faceCount: number;
-  gazeOk: boolean | null;
-  backend: string;
-  fps: number;
-};
+type DetResult = { faceCount: number; gazeOk: boolean | null; backend: string; fps: number };
 
 export function AdminFaceTest() {
-  const videoRef   = useRef<HTMLVideoElement>(null);
-  const canvasRef  = useRef<HTMLCanvasElement>(null);
-  const faceApiRef = useRef<any>(null);
-  const timerRef   = useRef<ReturnType<typeof setInterval> | null>(null);
-  const fpsFrames  = useRef<number[]>([]);
+  const videoRef  = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const apiRef    = useRef<any>(null);
+  const timerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
+  const fpsRef    = useRef<number[]>([]);
 
-  const [videoSrc, setVideoSrc]     = useState<string | null>(null);
-  const [status,   setStatus]       = useState<"idle" | "loading" | "ready" | "error">("idle");
-  const [result,   setResult]       = useState<DetResult | null>(null);
-  const [errMsg,   setErrMsg]       = useState<string | null>(null);
-  const [running,  setRunning]      = useState(false);
+  const [videoSrc, setVideoSrc] = useState<string | null>(null);
+  const [status,   setStatus]   = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [result,   setResult]   = useState<DetResult | null>(null);
+  const [errMsg,   setErrMsg]   = useState<string | null>(null);
+  const [running,  setRunning]  = useState(false);
+  const [log,      setLog]      = useState<string[]>([]);
+
+  function addLog(msg: string) {
+    setLog((prev) => [...prev.slice(-9), `[${new Date().toLocaleTimeString()}] ${msg}`]);
+  }
 
   async function loadModels() {
     setStatus("loading");
     setErrMsg(null);
+    addLog("Importing face-api.js…");
     try {
       const faceapi = await import("face-api.js");
-      // Force WebGL (GPU) backend
-      try { await (faceapi as any).tf.setBackend("webgl"); } catch {}
-      const backend: string = (faceapi as any).tf?.getBackend?.() ?? "unknown";
-      await Promise.all([
-        faceapi.nets.tinyFaceDetector.loadFromUri("/face-api-weights"),
-        faceapi.nets.faceLandmark68Net.loadFromUri("/face-api-weights"),
-      ]);
-      faceApiRef.current = { faceapi, backend };
+
+      // Set WebGL backend and wait for it to be ready
+      let backend = "cpu";
+      try {
+        const tf = (faceapi as any).tf;
+        if (tf) {
+          await tf.setBackend("webgl");
+          await tf.ready();
+          backend = tf.getBackend() ?? "webgl";
+          addLog(`TF backend: ${backend}`);
+        }
+      } catch (e: any) {
+        addLog(`WebGL unavailable, falling back to CPU: ${e?.message}`);
+      }
+
+      addLog("Loading TinyFaceDetector…");
+      await faceapi.nets.tinyFaceDetector.loadFromUri("/face-api-weights");
+      addLog("Loading FaceLandmark68Net…");
+      await faceapi.nets.faceLandmark68Net.loadFromUri("/face-api-weights");
+
+      apiRef.current = { faceapi, backend };
       setStatus("ready");
-      setResult((r) => r ? { ...r, backend } : null);
+      addLog("Models ready ✓");
     } catch (e: any) {
-      setErrMsg(e?.message ?? "Failed to load models");
+      const msg = e?.message ?? String(e);
+      setErrMsg(msg);
       setStatus("error");
+      addLog(`Error: ${msg}`);
     }
   }
 
@@ -47,142 +63,178 @@ export function AdminFaceTest() {
     if (videoSrc) URL.revokeObjectURL(videoSrc);
     setVideoSrc(URL.createObjectURL(file));
     setResult(null);
-    setRunning(false);
-    if (timerRef.current) clearInterval(timerRef.current);
+    stopDetection();
+    addLog(`Video loaded: ${file.name}`);
     if (status === "idle") loadModels();
   }
 
   function startDetection() {
     const vid = videoRef.current;
     const cvs = canvasRef.current;
-    const api = faceApiRef.current;
+    const api = apiRef.current;
     if (!vid || !cvs || !api) return;
 
     const { faceapi, backend } = api;
     setRunning(true);
-    fpsFrames.current = [];
+    fpsRef.current = [];
+    addLog("Detection started");
 
     timerRef.current = setInterval(async () => {
       if (vid.paused || vid.ended || vid.readyState < 2) return;
       const t0 = performance.now();
       try {
-        const results = await faceapi
-          .detectAllFaces(vid, new faceapi.TinyFaceDetectorOptions({ scoreThreshold: 0.45 }))
+        const detections = await faceapi
+          .detectAllFaces(vid, new faceapi.TinyFaceDetectorOptions({ scoreThreshold: 0.4 }))
           .withFaceLandmarks();
 
-        const count = results.length;
+        const count = detections.length;
         let gazeOk: boolean | null = count === 1 ? true : null;
 
-        // Draw overlay
-        const ctx = cvs.getContext("2d")!;
-        cvs.width  = vid.videoWidth  || vid.clientWidth;
-        cvs.height = vid.videoHeight || vid.clientHeight;
-        ctx.clearRect(0, 0, cvs.width, cvs.height);
+        // --- Canvas overlay with objectFit:contain letterbox math ---
+        const elW  = vid.clientWidth;
+        const elH  = vid.clientHeight;
+        const natW = vid.videoWidth  || elW;
+        const natH = vid.videoHeight || elH;
 
-        const scaleX = cvs.width  / (vid.videoWidth  || cvs.width);
-        const scaleY = cvs.height / (vid.videoHeight || cvs.height);
+        const scale   = Math.min(elW / natW, elH / natH);
+        const renderW = natW * scale;
+        const renderH = natH * scale;
+        const ox      = (elW - renderW) / 2;  // horizontal letterbox offset
+        const oy      = (elH - renderH) / 2;  // vertical letterbox offset
 
-        for (const r of results) {
-          const { x, y, width, height } = r.detection.box;
+        cvs.width  = elW;
+        cvs.height = elH;
+        const ctx  = cvs.getContext("2d")!;
+        ctx.clearRect(0, 0, elW, elH);
+
+        for (const det of detections) {
+          const { x, y, width, height } = det.detection.box;
+          const dx = x * scale + ox;
+          const dy = y * scale + oy;
+          const dw = width  * scale;
+          const dh = height * scale;
+
+          // Face bounding box
           ctx.strokeStyle = "#22c55e";
-          ctx.lineWidth = 2;
-          ctx.strokeRect(x * scaleX, y * scaleY, width * scaleX, height * scaleY);
+          ctx.lineWidth = 2.5;
+          ctx.strokeRect(dx, dy, dw, dh);
 
-          // Eye landmarks
-          const lms    = r.landmarks;
-          const leftEye  = lms.getLeftEye();
-          const rightEye = lms.getRightEye();
-          for (const pts of [leftEye, rightEye]) {
+          // Confidence label
+          ctx.fillStyle = "#22c55e";
+          ctx.font = "bold 11px monospace";
+          ctx.fillText(`${Math.round(det.detection.score * 100)}%`, dx + 4, dy - 5);
+
+          // Eye landmark polygons
+          const lms = det.landmarks;
+          for (const pts of [lms.getLeftEye(), lms.getRightEye()]) {
             ctx.beginPath();
             ctx.strokeStyle = "#60a5fa";
             ctx.lineWidth = 1.5;
-            pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x * scaleX, p.y * scaleY) : ctx.lineTo(p.x * scaleX, p.y * scaleY));
+            pts.forEach((p: any, i: number) => {
+              const px = p.x * scale + ox;
+              const py = p.y * scale + oy;
+              i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+            });
             ctx.closePath();
             ctx.stroke();
           }
 
-          // Gaze check
-          const allEye = [...leftEye, ...rightEye];
-          const eCX = allEye.reduce((s, p) => s + p.x, 0) / allEye.length;
-          const eCY = allEye.reduce((s, p) => s + p.y, 0) / allEye.length;
-          const nx = (eCX - x) / width;
-          const ny = (eCY - y) / height;
+          // Gaze check using eye-center normalized within face box
+          const allEye = [...lms.getLeftEye(), ...lms.getRightEye()];
+          const eCX = allEye.reduce((s: number, p: any) => s + p.x, 0) / allEye.length;
+          const eCY = allEye.reduce((s: number, p: any) => s + p.y, 0) / allEye.length;
+          const nx  = (eCX - x) / width;
+          const ny  = (eCY - y) / height;
           if (nx < 0.2 || nx > 0.8 || ny < 0.15 || ny > 0.6) gazeOk = false;
         }
 
-        // FPS tracking (sliding window of last 10 frames)
+        // FPS: sliding window of last 10 frame times
         const elapsed = performance.now() - t0;
-        fpsFrames.current.push(elapsed);
-        if (fpsFrames.current.length > 10) fpsFrames.current.shift();
-        const avgMs  = fpsFrames.current.reduce((s, v) => s + v, 0) / fpsFrames.current.length;
-        const fps    = Math.round(1000 / avgMs);
+        fpsRef.current.push(elapsed);
+        if (fpsRef.current.length > 10) fpsRef.current.shift();
+        const avgMs = fpsRef.current.reduce((s, v) => s + v, 0) / fpsRef.current.length;
+        const fps   = Math.round(1000 / avgMs);
 
         setResult({ faceCount: count, gazeOk, backend, fps });
-      } catch {}
+      } catch (e: any) {
+        addLog(`Detection error: ${e?.message ?? e}`);
+      }
     }, 300);
   }
 
   function stopDetection() {
-    if (timerRef.current) clearInterval(timerRef.current);
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
     setRunning(false);
     const cvs = canvasRef.current;
     if (cvs) cvs.getContext("2d")?.clearRect(0, 0, cvs.width, cvs.height);
+    if (running) addLog("Detection stopped");
   }
 
   useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current); }, []);
 
-  const statusColors = { idle: "var(--ink-3)", loading: "oklch(0.55 0.1 65)", ready: "var(--accent-ink)", error: "oklch(0.5 0.1 25)" };
+  const statusColor = { idle: "var(--ink-3)", loading: "oklch(0.6 0.12 65)", ready: "oklch(0.6 0.14 158)", error: "oklch(0.55 0.12 25)" }[status];
 
   return (
-    <div className="container adm-page" style={{ paddingTop: 28 }}>
-      <header style={{ marginBottom: 20 }}>
+    <div className="container adm-page" style={{ paddingTop: 28, maxWidth: 960 }}>
+      <header style={{ marginBottom: 24 }}>
         <p className="eyebrow">Admin · Dev Tools</p>
         <h1 className="serif" style={{ fontSize: 34, margin: "4px 0 6px", letterSpacing: "-0.02em" }}>Face Detection Test</h1>
-        <p style={{ color: "var(--ink-2)", margin: 0 }}>
-          Verify face landmark + gaze detection on a local video file. All inference runs in-browser on your GPU via WebGL.
+        <p style={{ color: "var(--ink-2)", margin: 0, fontSize: 14 }}>
+          Load a local video file to verify real-time face detection, eye-landmark gaze tracking, and GPU inference.
         </p>
       </header>
 
-      {/* Controls */}
-      <div className="card" style={{ padding: "20px 24px", marginBottom: 16 }}>
-        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-          <label className="btn ghost" style={{ cursor: "pointer" }}>
-            Choose video file
-            <input type="file" accept="video/*" style={{ display: "none" }} onChange={handleFile} />
-          </label>
+      {/* Controls bar */}
+      <div className="card" style={{ padding: "18px 20px", marginBottom: 16, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+        <label style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: "var(--r-md)", border: "1px solid var(--line)", cursor: "pointer", fontSize: 13, fontFamily: "var(--font-ui)", color: "var(--ink-2)", background: "var(--bg-2)", transition: "all 0.15s" }}
+          onMouseOver={(e) => (e.currentTarget.style.color = "var(--ink)")}
+          onMouseOut={(e) => (e.currentTarget.style.color = "var(--ink-2)")}>
+          Choose video file
+          <input type="file" accept="video/*" style={{ display: "none" }} onChange={handleFile} />
+        </label>
 
-          {status !== "idle" && (
-            <span className="mono" style={{ fontSize: 11, color: statusColors[status] }}>
-              Models: {status === "loading" ? "Loading…" : status === "ready" ? "Ready ✓" : "Error ✗"}
-            </span>
+        {status !== "idle" && (
+          <span className="mono" style={{ fontSize: 11, color: statusColor, display: "flex", alignItems: "center", gap: 5 }}>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: statusColor, display: "inline-block", flexShrink: 0,
+              animation: status === "loading" ? "pulse 1.2s infinite" : "none" }} />
+            {status === "loading" ? "Loading models…" : status === "ready" ? "Models ready" : "Error"}
+          </span>
+        )}
+
+        {apiRef.current?.backend && (
+          <span className="mono" style={{ fontSize: 11, padding: "3px 10px", borderRadius: 999, background: "var(--accent-soft)", color: "var(--accent-ink)", border: "1px solid var(--accent-soft)", fontWeight: 600 }}>
+            {apiRef.current.backend.toUpperCase()}
+          </span>
+        )}
+
+        {errMsg && (
+          <span style={{ fontSize: 12, color: "oklch(0.5 0.12 25)", fontFamily: "var(--font-mono)", background: "oklch(0.97 0.03 25)", padding: "4px 10px", borderRadius: "var(--r-sm)", border: "1px solid oklch(0.88 0.06 25)" }}>
+            {errMsg}
+          </span>
+        )}
+
+        <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+          {status === "idle" && (
+            <button className="btn ghost sm" onClick={loadModels}>Load models</button>
           )}
-
-          {result?.backend && (
-            <span className="mono" style={{ fontSize: 11, padding: "3px 8px", borderRadius: 999, background: "var(--accent-soft)", color: "var(--accent-ink)", border: "1px solid var(--accent-soft)" }}>
-              Backend: {result.backend}
-            </span>
-          )}
-
-          {errMsg && <span style={{ color: "oklch(0.5 0.1 25)", fontSize: 13 }}>{errMsg}</span>}
-
           {videoSrc && status === "ready" && (
             running
-              ? <button className="btn ghost sm" onClick={stopDetection}>Stop detection</button>
+              ? <button className="btn ghost sm" onClick={stopDetection}>Stop</button>
               : <button className="btn accent sm" onClick={startDetection}>▶ Start detection</button>
           )}
         </div>
       </div>
 
-      {/* Video + overlay */}
-      {videoSrc && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 16, alignItems: "start" }}>
+      <div style={{ display: "grid", gridTemplateColumns: videoSrc ? "1fr 260px" : "1fr", gap: 16, alignItems: "start" }}>
+        {/* Video */}
+        {videoSrc ? (
           <div style={{ position: "relative", background: "#000", borderRadius: "var(--r-xl)", overflow: "hidden" }}>
             <video
               ref={videoRef}
               src={videoSrc}
               controls
-              style={{ width: "100%", display: "block", maxHeight: 480, objectFit: "contain" }}
-              onPlay={() => status === "ready" && !running && startDetection()}
+              style={{ width: "100%", display: "block", maxHeight: 520, objectFit: "contain" }}
+              onPlay={() => { if (status === "ready" && !running) startDetection(); }}
               onPause={stopDetection}
               onEnded={stopDetection}
             />
@@ -191,53 +243,77 @@ export function AdminFaceTest() {
               style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}
             />
           </div>
+        ) : (
+          <div className="card" style={{ padding: "72px 40px", textAlign: "center" }}>
+            <div style={{ fontSize: 40, marginBottom: 12, opacity: 0.3 }}>🎥</div>
+            <p className="serif" style={{ fontSize: 22, margin: "0 0 8px" }}>No video loaded</p>
+            <p style={{ color: "var(--ink-3)", margin: 0, fontSize: 14 }}>
+              Choose a local MP4 or WebM file to begin face detection testing.
+            </p>
+          </div>
+        )}
 
-          {/* Live result panel */}
-          <div className="card" style={{ padding: "20px", minWidth: 200 }}>
-            <p className="eyebrow" style={{ margin: "0 0 14px" }}>Live results</p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <ResultRow label="Faces" value={result ? String(result.faceCount) : "—"}
-                ok={result?.faceCount === 1} />
-              <ResultRow label="Gaze"
-                value={result?.gazeOk == null ? "—" : result.gazeOk ? "On screen" : "Looking away"}
-                ok={result?.gazeOk ?? null} />
-              <ResultRow label="FPS" value={result ? `~${result.fps}` : "—"} ok={null} />
-              <ResultRow label="Backend" value={result?.backend ?? "—"} ok={result?.backend === "webgl" ? true : null} />
+        {videoSrc && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {/* Live results */}
+            <div className="card" style={{ padding: "18px 20px" }}>
+              <p className="eyebrow" style={{ margin: "0 0 14px" }}>Live results</p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <MetricRow label="Faces" value={result ? String(result.faceCount) : "—"}
+                  ok={result ? result.faceCount === 1 : null}
+                  bad={result ? result.faceCount !== 1 : null} />
+                <MetricRow label="Gaze"
+                  value={result?.gazeOk == null ? "—" : result.gazeOk ? "On screen" : "Away"}
+                  ok={result?.gazeOk ?? null}
+                  bad={result?.gazeOk === false} />
+                <MetricRow label="FPS" value={result ? `~${result.fps}` : "—"} ok={null} bad={null} />
+                <MetricRow label="Backend"
+                  value={result?.backend ?? apiRef.current?.backend ?? "—"}
+                  ok={result?.backend === "webgl"}
+                  bad={result?.backend != null && result.backend !== "webgl"} />
+              </div>
+
+              {result && result.faceCount !== 1 && running && (
+                <div style={{ marginTop: 12, padding: "9px 12px", borderRadius: "var(--r-sm)", background: "oklch(0.95 0.05 25)", color: "oklch(0.45 0.1 25)", fontSize: 12, fontWeight: 600 }}>
+                  ⚠ {result.faceCount === 0 ? "No face detected" : `${result.faceCount} faces — expected 1`}
+                </div>
+              )}
+              {result && result.faceCount === 1 && result.gazeOk === false && running && (
+                <div style={{ marginTop: 12, padding: "9px 12px", borderRadius: "var(--r-sm)", background: "oklch(0.97 0.04 65)", color: "oklch(0.45 0.1 65)", fontSize: 12, fontWeight: 600 }}>
+                  ⚠ Gaze anomaly detected
+                </div>
+              )}
             </div>
 
-            {result && result.faceCount !== 1 && (
-              <div style={{ marginTop: 14, padding: "10px 12px", borderRadius: "var(--r-sm)", background: "oklch(0.95 0.06 25)", color: "oklch(0.45 0.1 25)", fontSize: 13, fontWeight: 600 }}>
-                ⚠ {result.faceCount === 0 ? "No face detected" : `${result.faceCount} faces detected`}
+            {/* Debug log */}
+            <div className="card" style={{ padding: "14px 16px" }}>
+              <p className="eyebrow" style={{ margin: "0 0 8px" }}>Log</p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                {log.length === 0 && <span style={{ fontSize: 11, color: "var(--ink-3)", fontFamily: "var(--font-mono)" }}>No events yet</span>}
+                {log.map((l, i) => (
+                  <span key={i} style={{ fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--ink-3)", wordBreak: "break-all" }}>{l}</span>
+                ))}
               </div>
-            )}
-            {result && result.faceCount === 1 && result.gazeOk === false && (
-              <div style={{ marginTop: 14, padding: "10px 12px", borderRadius: "var(--r-sm)", background: "oklch(0.97 0.04 65)", color: "oklch(0.45 0.1 65)", fontSize: 13, fontWeight: 600 }}>
-                ⚠ Gaze anomaly — looking away
-              </div>
-            )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {!videoSrc && (
-        <div className="card" style={{ padding: "60px 32px", textAlign: "center" }}>
-          <p className="serif" style={{ fontSize: 22, margin: "0 0 10px" }}>No video selected</p>
-          <p style={{ color: "var(--ink-3)", margin: 0 }}>
-            Choose a local MP4 file above to test face detection and gaze tracking in real-time.
-          </p>
-        </div>
-      )}
+      <style>{`
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        .adm-page { padding-top: 28px; }
+      `}</style>
     </div>
   );
 }
 
-function ResultRow({ label, value, ok }: { label: string; value: string; ok: boolean | null }) {
-  const dot = ok === true ? "#22c55e" : ok === false ? "#f87171" : "var(--ink-3)";
+function MetricRow({ label, value, ok, bad }: { label: string; value: string; ok: boolean | null; bad: boolean | null }) {
+  const color = ok ? "#22c55e" : bad ? "#f87171" : "var(--ink-3)";
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13 }}>
       <span style={{ color: "var(--ink-3)" }}>{label}</span>
-      <span style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600 }}>
-        {ok !== null && <span style={{ width: 7, height: 7, borderRadius: "50%", background: dot, display: "inline-block" }} />}
+      <span style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600, color: ok || bad ? color : "var(--ink)" }}>
+        {(ok || bad) && <span style={{ width: 7, height: 7, borderRadius: "50%", background: color, display: "inline-block", flexShrink: 0 }} />}
         {value}
       </span>
     </div>
