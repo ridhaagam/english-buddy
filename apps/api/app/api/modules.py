@@ -140,6 +140,7 @@ async def get_module(module_id: UUID, user: CurrentUser, db: Annotated[AsyncSess
                 "context": q.context,
                 "sentence": q.sentence,
                 "payload": q.payload,
+                "explain": q.explain,
             }
             for q in questions
         ],

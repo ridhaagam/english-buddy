@@ -50,11 +50,8 @@ async def list_audit_log(
     )
     rows = result.all()
 
-    total_result = await db.execute(
-        select(AuditLog).with_only_columns(AuditLog.id)
-    )
-
     return {
+        "total": len(rows),
         "entries": [
             {
                 "id": str(log.id),

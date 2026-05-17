@@ -59,6 +59,7 @@ async def login(body: LoginBody, db: Annotated[AsyncSession, Depends(get_db)]):
     if not user or not verify_password(body.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     user.last_seen_at = datetime.now(timezone.utc)
+    await db.commit()
     access = create_access_token(str(user.id), user.role.value)
     refresh = create_refresh_token(str(user.id))
     return {"access": access, "refresh": refresh}

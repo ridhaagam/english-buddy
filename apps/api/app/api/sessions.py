@@ -110,7 +110,9 @@ async def get_my_session(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     result = await db.execute(
-        select(Session).where(and_(Session.id == session_id, Session.user_id == user.id))
+        select(Session).where(
+            and_(Session.id == session_id, Session.user_id == user.id, Session.finished_at.isnot(None))
+        )
     )
     session = result.scalar_one_or_none()
     if not session:
@@ -241,6 +243,7 @@ async def finish_session(
     session.total = total
     session.xp_earned = xp
 
+    await db.refresh(user)  # re-read latest xp_total before adding (avoids stale concurrent updates)
     user.xp_total += xp
 
     from datetime import date
@@ -284,14 +287,15 @@ async def upload_recording_chunk(
         return
 
     key = f"recordings/{session_id}.webm"
+    import logging
     try:
         from app.services.storage import put_object
         put_object(key, data, "video/webm")
-        session.recording_blob = key
-        await db.commit()
     except Exception:
-        import logging
-        logging.getLogger(__name__).exception("Failed to save recording for session %s", session_id)
+        logging.getLogger(__name__).exception("Storage write failed for session %s", session_id)
+        raise HTTPException(500, "Failed to save recording")
+    session.recording_blob = key
+    await db.commit()
 
 
 @router.get("/sessions/{session_id}/stream")
