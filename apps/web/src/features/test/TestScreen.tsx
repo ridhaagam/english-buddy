@@ -44,7 +44,6 @@ export function TestScreen({ moduleId, onExit, onDone }: Props) {
     api.sessions.create(moduleId)
       .then((data) => {
         setSessionId(data.id);
-        camRef.current?.setSessionId?.(data.id);
         api.sessions.logEvent(data.id, "open").catch(() => {});
       })
       .catch((err: Error) => {
@@ -364,6 +363,7 @@ export function TestScreen({ moduleId, onExit, onDone }: Props) {
         <aside className="camera-pane fade-up" style={{ animationDelay: "100ms" }}>
           <CameraCapture
             ref={camRef}
+            sessionId={sessionId}
             currentQuestionId={q.id}
             onFaceAnomaly={handleFaceAnomaly}
           />
@@ -541,8 +541,8 @@ function FillSentence({ sentence, pick }: { sentence: string; pick: any }) {
 
 const CameraCapture = forwardRef<
   { stopAndUpload: (sessionId: string) => Promise<void>; onFaceAnomaly: (questionId: string) => void; setSessionId: (id: string) => void },
-  { currentQuestionId: string; onFaceAnomaly: (questionId: string) => void }
->(function CameraCapture({ currentQuestionId, onFaceAnomaly }, ref) {
+  { sessionId: string | null; currentQuestionId: string; onFaceAnomaly: (questionId: string) => void }
+>(function CameraCapture({ sessionId: sessionIdProp, currentQuestionId, onFaceAnomaly }, ref) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -551,6 +551,19 @@ const CameraCapture = forwardRef<
   const streamRef = useRef<MediaStream | null>(null);
   const currentQIdRef = useRef(currentQuestionId);
   useEffect(() => { currentQIdRef.current = currentQuestionId; }, [currentQuestionId]);
+
+  // When the sessionId prop arrives (CameraCapture mounts after session is created),
+  // register it and flush any chunks buffered during the camera warm-up window
+  useEffect(() => {
+    if (!sessionIdProp) return;
+    sessionIdRef.current = sessionIdProp;
+    const pending = [...chunksRef.current];
+    chunksRef.current = [];
+    for (const chunk of pending) {
+      const c = chunk;
+      uploadQueueRef.current = uploadQueueRef.current.then(() => uploadChunk(c, sessionIdProp) as Promise<void>);
+    }
+  }, [sessionIdProp]);
 
   // Callback ref: sets srcObject the instant the <video> element mounts
   const videoCallbackRef = useCallback((node: HTMLVideoElement | null) => {
@@ -561,23 +574,36 @@ const CameraCapture = forwardRef<
     }
   }, []);
 
-  const uploadChunk = (blob: Blob, sid: string) => {
+  const uploadChunk = (blob: Blob, sid: string, keepalive = false) => {
     const fd = new FormData();
     fd.append("chunk", blob, "recording.webm");
     return fetch(`/api/v1/sessions/${sid}/recording-chunk`, {
       method: "POST",
       headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` },
       body: fd,
-      keepalive: true,
+      keepalive,
     }).catch(() => {});
   };
 
-  // Flush any buffered encoder data when the tab is hidden (covers close/switch)
+  // On tab hide: force the encoder to emit any buffered data so it can be uploaded
+  // with keepalive=true (completes even if the page is closing)
   useEffect(() => {
     const flush = () => {
-      if (document.visibilityState === "hidden" && recorderRef.current?.state === "recording") {
-        recorderRef.current.requestData();
-      }
+      if (document.visibilityState !== "hidden") return;
+      const sid = sessionIdRef.current;
+      const recorder = recorderRef.current;
+      if (!sid || !recorder || recorder.state !== "recording") return;
+      // Override ondataavailable temporarily to use keepalive for this emergency flush
+      const original = recorder.ondataavailable;
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          uploadQueueRef.current = uploadQueueRef.current.then(
+            () => uploadChunk(e.data, sid, true) as Promise<void>
+          );
+        }
+        recorder.ondataavailable = original;
+      };
+      recorder.requestData();
     };
     document.addEventListener("visibilitychange", flush);
     return () => document.removeEventListener("visibilitychange", flush);
@@ -605,16 +631,31 @@ const CameraCapture = forwardRef<
       }
       chunksRef.current = [];
     },
-    stopAndUpload: async (_sessionId: string) => {
+    stopAndUpload: async (sessionId: string) => {
+      // Ensure sessionId is registered — guards against the case where the prop
+      // effect hadn't fired yet (e.g. CameraCapture was just mounting)
+      if (!sessionIdRef.current) {
+        sessionIdRef.current = sessionId;
+      }
+      // Flush any chunks buffered before sessionId was known
+      const pending = [...chunksRef.current];
+      chunksRef.current = [];
+      for (const chunk of pending) {
+        const c = chunk;
+        uploadQueueRef.current = uploadQueueRef.current.then(() => uploadChunk(c, sessionId) as Promise<void>);
+      }
+
       const recorder = recorderRef.current;
-      if (!recorder || recorder.state === "inactive") return;
+      if (!recorder || recorder.state === "inactive") {
+        await uploadQueueRef.current;
+        setStatus("done");
+        return;
+      }
       setStatus("uploading");
-      // Stop triggers a final ondataavailable with remaining data
       await new Promise<void>((resolve) => {
         recorder.onstop = () => resolve();
         recorder.stop();
       });
-      // Wait for all queued chunk uploads to finish
       await uploadQueueRef.current;
       setStatus("done");
     },
