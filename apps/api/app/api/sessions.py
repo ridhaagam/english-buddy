@@ -14,7 +14,7 @@ from app.core.deps import CurrentUser
 from app.core.security import create_access_token, decode_token
 from app.models.module import Module, ModuleStatus, TopicType
 from app.models.question import Question
-from app.models.session import Session, SessionAnswer
+from app.models.session import Session, SessionAnswer, SessionEvent
 from app.services.storage import get_file_path, object_exists, put_object
 
 logger = logging.getLogger(__name__)
@@ -30,10 +30,14 @@ class AnswerBody(BaseModel):
     question_id: str
     selection: dict
     time_spent_ms: int | None = None
+    tab_switch: bool = False
+    face_anomaly: bool = False
 
 
 class FinishBody(BaseModel):
     timezone: str | None = None
+    tab_switch_count: int = 0
+    face_anomaly_count: int = 0
 
 
 async def _get_owned_session(
@@ -56,6 +60,23 @@ async def create_session(
     if not m or m.status != ModuleStatus.published:
         raise HTTPException(404, "Module not found")
 
+    if m.is_closed:
+        raise HTTPException(403, "Module is closed")
+
+    if m.deadline:
+        from datetime import timezone as _tz
+        if datetime.now(_tz.utc) > m.deadline:
+            raise HTTPException(403, "Module deadline has passed")
+
+    if m.max_attempts:
+        attempts_r = await db.execute(
+            select(func.count()).where(
+                and_(Session.module_id == m.id, Session.user_id == user.id, Session.finished_at.isnot(None))
+            )
+        )
+        if (attempts_r.scalar() or 0) >= m.max_attempts:
+            raise HTTPException(403, "Maximum attempts reached")
+
     session = Session(
         user_id=user.id,
         module_id=UUID(body.module_id),
@@ -72,14 +93,38 @@ async def create_session(
 async def my_sessions(
     user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
+    dedupe: bool = False,
 ):
-    result = await db.execute(
-        select(Session, Module)
-        .join(Module, Session.module_id == Module.id)
-        .where(and_(Session.user_id == user.id, Session.finished_at.isnot(None)))
-        .order_by(Session.finished_at.desc())
-        .limit(50)
-    )
+    from sqlalchemy import text
+    if dedupe:
+        # Return only the most-recent session per module using a subquery
+        sub = (
+            select(
+                Session.id,
+                func.row_number().over(
+                    partition_by=Session.module_id,
+                    order_by=Session.finished_at.desc(),
+                ).label("rn"),
+            )
+            .where(and_(Session.user_id == user.id, Session.finished_at.isnot(None)))
+            .subquery()
+        )
+        result = await db.execute(
+            select(Session, Module)
+            .join(Module, Session.module_id == Module.id)
+            .join(sub, Session.id == sub.c.id)
+            .where(sub.c.rn == 1)
+            .order_by(Session.finished_at.desc())
+            .limit(50)
+        )
+    else:
+        result = await db.execute(
+            select(Session, Module)
+            .join(Module, Session.module_id == Module.id)
+            .where(and_(Session.user_id == user.id, Session.finished_at.isnot(None)))
+            .order_by(Session.finished_at.desc())
+            .limit(50)
+        )
     rows = result.all()
     return [
         {
@@ -91,6 +136,8 @@ async def my_sessions(
             "correct_count": s.correct_count,
             "total": s.total,
             "xp_earned": s.xp_earned,
+            "tab_switch_count": s.tab_switch_count,
+            "face_anomaly_count": s.face_anomaly_count,
             "finished_at": s.finished_at.isoformat() if s.finished_at else None,
             "recording_blob": s.recording_blob,
             "flagged": s.flagged,
@@ -129,6 +176,14 @@ async def get_my_session(
     if not session:
         raise HTTPException(404, "Session not found")
 
+    mod_r = await db.execute(select(Module).where(Module.id == session.module_id))
+    module = mod_r.scalar_one_or_none()
+
+    # Answers are revealed only after reveal_at (if set); otherwise always visible
+    answers_revealed = True
+    if module and module.reveal_at:
+        answers_revealed = datetime.now(timezone.utc) >= module.reveal_at
+
     ans_r = await db.execute(
         select(SessionAnswer).where(SessionAnswer.session_id == session_id)
     )
@@ -139,24 +194,42 @@ async def get_my_session(
     )
     questions = {str(q.id): q for q in qs_r.scalars().all()}
 
+    def _safe_payload(a: SessionAnswer, q) -> dict:
+        if not q:
+            return {}
+        payload = dict(q.payload)
+        # Strip correct answer if reveal_at hasn't passed yet, or if admin-flagged
+        if not answers_revealed or (a.flagged and a.admin_comment):
+            payload.pop("answer", None)
+        return payload
+
     return {
         "id": str(session.id),
         "module_id": str(session.module_id),
-        "score_pct": session.score_pct,
-        "correct_count": session.correct_count,
+        "module_title": module.title if module else "",
+        "reveal_at": module.reveal_at.isoformat() if module and module.reveal_at else None,
+        "answers_revealed": answers_revealed,
+        "score_pct": session.score_pct if answers_revealed else None,
+        "correct_count": session.correct_count if answers_revealed else None,
         "total": session.total,
         "xp_earned": session.xp_earned,
+        "tab_switch_count": session.tab_switch_count,
+        "face_anomaly_count": session.face_anomaly_count,
         "finished_at": session.finished_at.isoformat() if session.finished_at else None,
         "recording_blob": session.recording_blob,
         "answers": [
             {
                 "question_id": str(a.question_id),
-                "selection": a.selection,
-                "is_correct": a.is_correct,
+                "selection": a.selection if answers_revealed else None,
+                "is_correct": a.is_correct if answers_revealed else None,
                 "time_spent_ms": a.time_spent_ms,
-                "prompt": questions[str(a.question_id)].prompt if str(a.question_id) in questions else "",
+                "flagged": a.flagged,
+                "admin_comment": a.admin_comment,
+                "tab_switch": a.tab_switch,
+                "face_anomaly": a.face_anomaly,
+                "question_prompt": questions[str(a.question_id)].prompt if str(a.question_id) in questions else "",
                 "kind": questions[str(a.question_id)].kind.value if str(a.question_id) in questions else "",
-                "payload": questions[str(a.question_id)].payload if str(a.question_id) in questions else {},
+                "payload": _safe_payload(a, questions.get(str(a.question_id))),
             }
             for a in answers
         ],
@@ -204,6 +277,8 @@ async def submit_answer(
         selection=body.selection,
         is_correct=is_correct,
         time_spent_ms=body.time_spent_ms,
+        tab_switch=body.tab_switch,
+        face_anomaly=body.face_anomaly,
     )
     db.add(ans)
     return {"is_correct": is_correct}
@@ -244,6 +319,9 @@ async def finish_session(
     session.correct_count = correct_count
     session.total = total
     session.xp_earned = xp
+    if body:
+        session.tab_switch_count = body.tab_switch_count
+        session.face_anomaly_count = body.face_anomaly_count
 
     await db.refresh(user)  # re-read latest xp_total before adding (avoids stale concurrent updates)
     user.xp_total += xp
@@ -377,3 +455,29 @@ async def get_library(
             "last_taken": last_taken.isoformat() if last_taken else None,
         })
     return out
+
+
+class SessionEventBody(BaseModel):
+    event_type: str  # "open" | "interrupt" | "close" | "resume"
+    event_data: dict | None = None
+
+
+@router.post("/sessions/{session_id}/event", status_code=204)
+async def log_session_event(
+    session_id: UUID,
+    body: SessionEventBody,
+    user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    session = await _get_owned_session(db, session_id, user.id)
+    if not session:
+        raise HTTPException(404, "Session not found")
+
+    event = SessionEvent(
+        session_id=session_id,
+        user_id=user.id,
+        event_type=body.event_type,
+        event_data=body.event_data,
+    )
+    db.add(event)
+    await db.commit()

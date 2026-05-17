@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -53,6 +53,11 @@ class Module(Base):
     source_blob: Mapped[str | None] = mapped_column(Text, nullable=True)
     audio_blob: Mapped[str | None] = mapped_column(Text, nullable=True)
     audio_duration_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    deadline: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    is_closed: Mapped[bool] = mapped_column(Boolean, default=False)
+    max_attempts: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    show_answers_after_deadline: Mapped[bool] = mapped_column(Boolean, default=True)
+    reveal_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

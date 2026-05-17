@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { AnimatedNumber, ProgressBar, ArrowRightIcon, SparkleIcon, AchGlyph, CheckIcon } from "../../components/ui";
+import { AnimatedNumber, AchGlyph, CheckIcon, ArrowRightIcon, SparkleIcon } from "../../components/ui";
 import { api } from "../../lib/api";
 
 type Props = {
@@ -16,13 +16,16 @@ export function ProfileScreen({ user, onStartTest, onNav }: Props) {
   const dailyPct = Math.min(1, dailyXP / dailyGoal);
 
   const statCards = [
-    { label: "Day streak", value: stats?.streak ?? user.streak ?? 0, sub: "Keep it up", fmt: (n: number) => Math.round(n).toString() },
-    { label: "Total XP", value: stats?.xp_total ?? user.xp_total ?? 0, sub: "+this week", fmt: (n: number) => Math.round(n).toLocaleString() },
-    { label: "Accuracy", value: stats?.avg_accuracy ?? 0, sub: "last 7 days", fmt: (n: number) => Math.round(n) + "%" },
-    { label: "XP this week", value: stats?.xp_this_week ?? 0, sub: "earned", fmt: (n: number) => Math.round(n).toLocaleString() },
+    { label: "Day streak",    value: stats?.streak ?? user.streak ?? 0,         sub: "Keep it up",    fmt: (n: number) => Math.round(n).toString() },
+    { label: "Total XP",     value: stats?.xp_total ?? user.xp_total ?? 0,     sub: "+this week",    fmt: (n: number) => Math.round(n).toLocaleString() },
+    { label: "Accuracy",     value: stats?.avg_accuracy ?? 0,                   sub: "last 7 days",   fmt: (n: number) => Math.round(n) + "%" },
+    { label: "XP this week", value: stats?.xp_this_week ?? 0,                  sub: "earned",        fmt: (n: number) => Math.round(n).toLocaleString() },
   ];
 
-  const achievements = stats?.achievements ?? [];
+  const allAchievements = stats?.achievements ?? [];
+  // Only show achievements earned in the last 48 hours on the dashboard
+  const cutoff = Date.now() - 48 * 60 * 60 * 1000;
+  const recentAch = allAchievements.filter((a: any) => a.earned && a.earned_at && new Date(a.earned_at).getTime() >= cutoff);
 
   return (
     <div className="container">
@@ -33,28 +36,30 @@ export function ProfileScreen({ user, onStartTest, onNav }: Props) {
             Hello, <span className="serif-it">{user.display_name?.split(" ")[0] ?? "learner"}</span>.
           </h1>
           <p style={{ color: "var(--ink-2)", maxWidth: 560, margin: 0 }}>
-            You're on a <strong>{user.streak ?? 0}-day</strong> streak. Today's 10-minute session is ready.
+            You're on a <strong>{user.streak ?? 0}-day</strong> streak. Today's session is ready.
           </p>
         </div>
         <div className="hero-right">
           <div className="daily-goal" title="Daily XP goal">
-            <svg viewBox="0 0 80 80" width="84" height="84">
-              <circle cx="40" cy="40" r="34" stroke="var(--line)" strokeWidth="7" fill="none" />
-              <circle cx="40" cy="40" r="34" stroke="url(#dgGrad)" strokeWidth="7" fill="none" strokeLinecap="round"
-                strokeDasharray={2 * Math.PI * 34}
-                strokeDashoffset={2 * Math.PI * 34 * (1 - dailyPct)}
-                transform="rotate(-90 40 40)"
-                style={{ transition: "stroke-dashoffset 1.4s cubic-bezier(0.22, 1, 0.36, 1)" }} />
-              <defs>
-                <linearGradient id="dgGrad" x1="0" x2="1" y1="0" y2="1">
-                  <stop offset="0%" stopColor="oklch(0.7 0.14 145)" />
-                  <stop offset="100%" stopColor="oklch(0.55 0.12 158)" />
-                </linearGradient>
-              </defs>
-            </svg>
-            <div className="dg-text">
-              <strong className="serif"><AnimatedNumber value={dailyXP} /></strong>
-              <span className="mono">/ {dailyGoal} XP</span>
+            <div className="dg-ring">
+              <svg viewBox="0 0 80 80" width="84" height="84" style={{ position: "absolute", inset: 0 }}>
+                <circle cx="40" cy="40" r="34" stroke="var(--line)" strokeWidth="7" fill="none" />
+                <circle cx="40" cy="40" r="34" stroke="url(#dgGrad)" strokeWidth="7" fill="none" strokeLinecap="round"
+                  strokeDasharray={2 * Math.PI * 34}
+                  strokeDashoffset={2 * Math.PI * 34 * (1 - dailyPct)}
+                  transform="rotate(-90 40 40)"
+                  style={{ transition: "stroke-dashoffset 1.4s cubic-bezier(0.22, 1, 0.36, 1)" }} />
+                <defs>
+                  <linearGradient id="dgGrad" x1="0" x2="1" y1="0" y2="1">
+                    <stop offset="0%" stopColor="oklch(0.7 0.14 145)" />
+                    <stop offset="100%" stopColor="oklch(0.55 0.12 158)" />
+                  </linearGradient>
+                </defs>
+              </svg>
+              <div className="dg-text">
+                <strong className="serif"><AnimatedNumber value={dailyXP} /></strong>
+                <span className="mono">/ {dailyGoal} XP</span>
+              </div>
             </div>
             <span className="eyebrow">Today's goal</span>
           </div>
@@ -76,29 +81,29 @@ export function ProfileScreen({ user, onStartTest, onNav }: Props) {
         ))}
       </section>
 
-      <section className="ach-strip fade-up" style={{ animationDelay: "160ms" }}>
-        <div className="ach-strip-head">
-          <h2 className="serif" style={{ margin: 0, fontSize: 20 }}>
-            Achievements <span className="serif-it" style={{ color: "var(--ink-3)" }}>· {achievements.filter((a: any) => a.earned).length}/{achievements.length}</span>
-          </h2>
-          <span className="eyebrow">your trophy shelf</span>
-        </div>
-        <div className="ach-grid">
-          {achievements.map((a: any, i: number) => (
-            <div key={a.id} className={"ach-card" + (a.earned ? " earned" : "")} style={{ animationDelay: `${220 + i * 60}ms` }}>
-              <div className="ach-glyph"><AchGlyph kind={a.id} /></div>
-              <div className="ach-body">
-                <strong>{a.title}</strong>
-                <span>{a.sub}</span>
-                {!a.earned && a.progress_pct > 0 && (
-                  <div className="ach-prog"><span style={{ width: `${a.progress_pct}%` }} /></div>
-                )}
+      {/* Recent achievements (last 48h) */}
+      {recentAch.length > 0 && (
+        <section className="ach-strip fade-up" style={{ animationDelay: "160ms" }}>
+          <div className="ach-strip-head">
+            <h2 className="serif" style={{ margin: 0, fontSize: 20 }}>
+              New achievements <span className="serif-it" style={{ color: "var(--ink-3)" }}>· {recentAch.length}</span>
+            </h2>
+            <button className="link-btn mono" onClick={() => onNav("profile-edit")} type="button">See all →</button>
+          </div>
+          <div className="ach-grid">
+            {recentAch.map((a: any, i: number) => (
+              <div key={a.id} className="ach-card earned" style={{ animationDelay: `${220 + i * 60}ms` }}>
+                <div className="ach-glyph"><AchGlyph kind={a.id} /></div>
+                <div className="ach-body">
+                  <strong>{a.title}</strong>
+                  <span>{a.sub}</span>
+                </div>
+                <span className="ach-tick"><CheckIcon size={12} /></span>
               </div>
-              {a.earned && <span className="ach-tick"><CheckIcon size={12} /></span>}
-            </div>
-          ))}
-        </div>
-      </section>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="lower">
         <div className="card panel fade-up" style={{ animationDelay: "180ms" }}>
@@ -122,16 +127,46 @@ export function ProfileScreen({ user, onStartTest, onNav }: Props) {
             View sessions <ArrowRightIcon size={14} />
           </button>
         </div>
+
+        {/* Trophies teaser */}
+        <div className="card panel fade-up" style={{ animationDelay: "300ms", gridColumn: "1 / -1" }}>
+          <div className="panel-head">
+            <h2 className="serif" style={{ margin: 0, fontSize: 22 }}>
+              Achievements <span className="serif-it" style={{ color: "var(--ink-3)", fontSize: 18 }}>· {allAchievements.filter((a: any) => a.earned).length}/{allAchievements.length}</span>
+            </h2>
+            <button className="link-btn mono" onClick={() => onNav("profile-edit")} type="button">See all →</button>
+          </div>
+          {allAchievements.length === 0 ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, color: "var(--ink-3)" }}>
+              <SparkleIcon size={20} />
+              <p style={{ margin: 0, fontSize: 14 }}>Complete your first module to start earning trophies!</p>
+            </div>
+          ) : (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {allAchievements.slice(0, 8).map((a: any) => (
+                <div key={a.id} title={a.title} style={{ width: 36, height: 36, borderRadius: 10, background: a.earned ? "var(--accent-soft)" : "var(--bg-2)", color: a.earned ? "var(--accent-ink)" : "var(--ink-3)", border: "1px solid var(--line-2)", display: "grid", placeItems: "center", opacity: a.earned ? 1 : 0.5 }}>
+                  <AchGlyph kind={a.id} />
+                </div>
+              ))}
+              {allAchievements.length > 8 && (
+                <button onClick={() => onNav("profile-edit")} style={{ width: 36, height: 36, borderRadius: 10, background: "var(--bg-2)", border: "1px solid var(--line)", fontSize: 11, color: "var(--ink-3)", cursor: "pointer" }}>
+                  +{allAchievements.length - 8}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </section>
 
       <style>{`
         .hero { display:grid; grid-template-columns:1.5fr 1fr; gap:28px; align-items:end; padding:24px 28px; background:linear-gradient(135deg,oklch(0.97 0.018 158) 0%,oklch(0.985 0.006 85) 60%); border:1px solid var(--line); border-radius:var(--r-xl); margin-bottom:24px; position:relative; overflow:hidden; }
         .hero::before { content:""; position:absolute; right:-120px;top:-80px; width:320px;height:320px; border-radius:50%; background:radial-gradient(closest-side,oklch(0.55 0.12 158/0.18),transparent 70%); pointer-events:none; }
         .hero-right { display:flex; flex-direction:column; align-items:flex-end; gap:14px; z-index:1; }
-        .daily-goal { display:flex; flex-direction:column; align-items:center; gap:4px; position:relative; }
-        .dg-text { position:absolute; top:50%; left:50%; transform:translate(-50%,-52%); display:flex; flex-direction:column; align-items:center; gap:0; }
-        .dg-text strong { font-size:22px; letter-spacing:-0.02em; }
-        .dg-text .mono { font-size:10px; color:var(--ink-3); }
+        .daily-goal { display:flex; flex-direction:column; align-items:center; gap:4px; }
+        .dg-ring { position:relative; width:84px; height:84px; display:grid; place-items:center; flex-shrink:0; }
+        .dg-text { display:flex; flex-direction:column; align-items:center; line-height:1; gap:2px; }
+        .dg-text strong { font-size:20px; letter-spacing:-0.02em; line-height:1; }
+        .dg-text .mono { font-size:10px; color:var(--ink-3); line-height:1; }
         .stat-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:24px; }
         .stat-card { padding:18px 20px; display:flex; flex-direction:column; gap:4px; }
         .stat-val { font-size:32px; letter-spacing:-0.02em; }
@@ -145,10 +180,8 @@ export function ProfileScreen({ user, onStartTest, onNav }: Props) {
         .ach-body { display:flex; flex-direction:column; gap:1px; min-width:0; flex:1; }
         .ach-body strong { font-size:13px; font-weight:600; }
         .ach-body span { font-size:12px; color:var(--ink-3); }
-        .ach-prog { height:4px; background:var(--line-2); border-radius:999px; overflow:hidden; margin-top:6px; }
-        .ach-prog span { display:block; height:100%; background:var(--accent); border-radius:999px; }
         .ach-tick { width:22px;height:22px; border-radius:50%; background:var(--accent); color:white; display:grid; place-items:center; flex-shrink:0; }
-        .lower { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+        .lower { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:0; }
         .panel { padding:22px 24px; display:flex; flex-direction:column; }
         .panel-head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:12px; }
         .link-btn { background:none; border:0; padding:0; font-size:12px; letter-spacing:0.06em; text-transform:uppercase; color:var(--accent-ink); cursor:pointer; font-weight:600; }

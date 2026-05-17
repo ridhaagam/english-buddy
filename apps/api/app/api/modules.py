@@ -2,6 +2,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -111,17 +112,27 @@ async def list_modules(
 
 
 @router.get("/modules/{module_id}")
-async def get_module(module_id: UUID, user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]):
+async def get_module(
+    module_id: UUID,
+    user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    session_id: str | None = Query(None),
+):
     result = await db.execute(select(Module).where(Module.id == module_id))
     m = result.scalar_one_or_none()
     if not m or m.status != ModuleStatus.published:
         raise HTTPException(404, "Module not found")
 
     from app.models.question import Question
+    import random
     q_r = await db.execute(
         select(Question).where(Question.module_id == module_id).order_by(Question.position)
     )
-    questions = q_r.scalars().all()
+    questions = list(q_r.scalars().all())
+
+    if session_id:
+        rng = random.Random(session_id)
+        rng.shuffle(questions)
 
     return {
         "id": str(m.id),
@@ -131,6 +142,9 @@ async def get_module(module_id: UUID, user: CurrentUser, db: Annotated[AsyncSess
         "status": m.status.value,
         "audio_blob": m.audio_blob,
         "audio_duration_seconds": m.audio_duration_seconds,
+        "deadline": m.deadline.isoformat() if m.deadline else None,
+        "is_closed": m.is_closed,
+        "max_attempts": m.max_attempts,
         "questions": [
             {
                 "id": str(q.id),
@@ -145,3 +159,24 @@ async def get_module(module_id: UUID, user: CurrentUser, db: Annotated[AsyncSess
             for q in questions
         ],
     }
+
+
+@router.get("/modules/{module_id}/audio")
+async def stream_module_audio(
+    module_id: UUID,
+    user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    from fastapi.responses import FileResponse
+    from app.services.storage import get_file_path, object_exists
+
+    result = await db.execute(select(Module).where(Module.id == module_id))
+    m = result.scalar_one_or_none()
+    if not m or m.status != ModuleStatus.published:
+        raise HTTPException(404, "Module not found")
+    if not m.audio_blob:
+        raise HTTPException(404, "No audio for this module")
+    if not object_exists(m.audio_blob):
+        raise HTTPException(404, "Audio file not found")
+    path = get_file_path(m.audio_blob)
+    return FileResponse(str(path), media_type="audio/mpeg")

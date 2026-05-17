@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, forwardRef, useImperativeHandle } from "react";
+import { useState, useEffect, useRef, useMemo, forwardRef, useImperativeHandle, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { ProgressBar, XIcon, ClockIcon, ArrowRightIcon, CheckIcon } from "../../components/ui";
 import { api } from "../../lib/api";
@@ -10,21 +10,40 @@ type Props = {
 };
 
 export function TestScreen({ moduleId, onExit, onDone }: Props) {
-  const { data: module, isLoading } = useQuery({
-    queryKey: ["module", moduleId],
-    queryFn: () => api.modules.get(moduleId),
-  });
-
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [idx, setIdx] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
+  const [fillInput, setFillInput] = useState("");
   const [matchPairs, setMatchPairs] = useState<Record<string, string>>({});
   const [matchSel, setMatchSel] = useState<{ side: "L" | "R"; value: string } | null>(null);
   const [answers, setAnswers] = useState<any[]>([]);
   const [elapsed, setElapsed] = useState(0);
+  const [tabSwitchCount, setTabSwitchCount] = useState(0);
+  const [faceAnomalyCount, setFaceAnomalyCount] = useState(0);
+  const [proctoringMeta, setProctoringMeta] = useState<Record<string, { tab_switch: boolean; face_anomaly: boolean }>>({});
+  const [tabAlert, setTabAlert] = useState(false);
+  const [exitDialog, setExitDialog] = useState(false);
   const startRef = useRef(Date.now());
   const qStartRef = useRef(Date.now());
-  const camRef = useRef<{ stopAndUpload: (sessionId: string) => Promise<void> }>(null);
+  const camRef = useRef<{
+    stopAndUpload: (sessionId: string) => Promise<void>;
+    onFaceAnomaly: (questionId: string) => void;
+  }>(null);
+
+  // Fetch module metadata first (no shuffle)
+  const { data: moduleMeta, isLoading } = useQuery({
+    queryKey: ["module-meta", moduleId],
+    queryFn: () => api.modules.get(moduleId),
+  });
+
+  // Once session exists, refetch with session_id for deterministic shuffle
+  const { data: module } = useQuery({
+    queryKey: ["module", moduleId, sessionId],
+    queryFn: () => api.modules.get(moduleId, sessionId!),
+    enabled: !!sessionId,
+  });
+
+  const displayModule = module ?? moduleMeta;
 
   useEffect(() => {
     const t = setInterval(() => setElapsed(Date.now() - startRef.current), 500);
@@ -33,22 +52,63 @@ export function TestScreen({ moduleId, onExit, onDone }: Props) {
 
   const createSession = useMutation({
     mutationFn: () => api.sessions.create(moduleId),
-    onSuccess: (data) => setSessionId(data.id),
+    onSuccess: (data) => {
+      setSessionId(data.id);
+      api.sessions.logEvent(data.id, "open").catch(() => {});
+    },
   });
 
   useEffect(() => {
-    if (module && !sessionId) createSession.mutate();
-  }, [module]);
+    if (moduleMeta && !sessionId) createSession.mutate();
+  }, [moduleMeta]);
 
-  const questions = module?.questions || [];
+  const questions = displayModule?.questions || [];
   const q = questions[idx];
+
+  // beforeunload guard — warns if user tries to close tab/refresh mid-session
+  useEffect(() => {
+    if (!sessionId) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [sessionId]);
+
+  // Tab-switch detection
+  useEffect(() => {
+    if (!q) return;
+    const handler = () => {
+      if (document.visibilityState === "hidden") {
+        setTabSwitchCount((c) => c + 1);
+        setProctoringMeta((prev) => ({
+          ...prev,
+          [q.id]: { ...(prev[q.id] ?? {}), tab_switch: true, face_anomaly: prev[q.id]?.face_anomaly ?? false },
+        }));
+        setTabAlert(true);
+        setTimeout(() => setTabAlert(false), 3000);
+      }
+    };
+    document.addEventListener("visibilitychange", handler);
+    return () => document.removeEventListener("visibilitychange", handler);
+  }, [q?.id]);
+
+  const handleFaceAnomaly = useCallback((questionId: string) => {
+    setFaceAnomalyCount((c) => c + 1);
+    setProctoringMeta((prev) => ({
+      ...prev,
+      [questionId]: { ...(prev[questionId] ?? {}), face_anomaly: true, tab_switch: prev[questionId]?.tab_switch ?? false },
+    }));
+  }, []);
+
   const rightCol = useMemo(() => {
     if (!q || q.kind !== "match") return [];
     const pairs = q.payload?.pairs || [];
     return [...pairs.map((p: any) => p.right)].sort((a: string, b: string) => a.localeCompare(b));
   }, [q?.id]);
 
-  if (isLoading || !module) return (
+  if (isLoading || !moduleMeta) return (
     <div style={{ display: "grid", placeItems: "center", height: "100vh" }}>
       <div className="dot-load"><i /><i /><i /></div>
     </div>
@@ -60,9 +120,19 @@ export function TestScreen({ moduleId, onExit, onDone }: Props) {
 
   const matchedRights = new Set(Object.values(matchPairs));
   const allMatched = q.kind === "match" && (q.payload?.pairs || []).every((p: any) => matchPairs[p.left]);
-  const canSubmit = (q.kind === "match" && allMatched) || (q.kind !== "match" && selected !== null);
+  const canSubmit =
+    (q.kind === "match" && allMatched) ||
+    (q.kind === "fill" && fillInput.trim().length > 0) ||
+    (q.kind !== "match" && q.kind !== "fill" && selected !== null) ||
+    (q.kind === "listen_choice" && selected !== null);
 
-  function resetQ() { setSelected(null); setMatchPairs({}); setMatchSel(null); qStartRef.current = Date.now(); }
+  function resetQ() {
+    setSelected(null);
+    setFillInput("");
+    setMatchPairs({});
+    setMatchSel(null);
+    qStartRef.current = Date.now();
+  }
 
   function pickMatch(side: "L" | "R", value: string) {
     if (matchSel?.side === side && matchSel.value === value) { setMatchSel(null); return; }
@@ -79,13 +149,22 @@ export function TestScreen({ moduleId, onExit, onDone }: Props) {
     let selection: Record<string, string>;
     if (q.kind === "match") {
       selection = { ...matchPairs };
+    } else if (q.kind === "fill") {
+      selection = { choice: fillInput.trim() };
     } else {
       selection = { choice: selected! };
     }
     const timeMs = Date.now() - qStartRef.current;
+    const meta = proctoringMeta[q.id] ?? { tab_switch: false, face_anomaly: false };
     let is_correct = false;
     try {
-      const res = await api.sessions.answer(sessionId, { question_id: q.id, selection, time_spent_ms: timeMs });
+      const res = await api.sessions.answer(sessionId, {
+        question_id: q.id,
+        selection,
+        time_spent_ms: timeMs,
+        tab_switch: meta.tab_switch,
+        face_anomaly: meta.face_anomaly,
+      });
       is_correct = res?.is_correct ?? false;
     } catch {}
 
@@ -101,8 +180,12 @@ export function TestScreen({ moduleId, onExit, onDone }: Props) {
 
     if (last) {
       try {
-        const result = await api.sessions.finish(sessionId, Intl.DateTimeFormat().resolvedOptions().timeZone);
-        // Upload recording first so it completes before component unmounts
+        const result = await api.sessions.finish(sessionId, {
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          tab_switch_count: tabSwitchCount,
+          face_anomaly_count: faceAnomalyCount,
+        });
+        api.sessions.logEvent(sessionId, "close").catch(() => {});
         if (camRef.current) {
           await camRef.current.stopAndUpload(sessionId);
         }
@@ -125,19 +208,36 @@ export function TestScreen({ moduleId, onExit, onDone }: Props) {
   return (
     <div className="test-shell">
       <header className="test-head">
-        <button className="icon-btn" onClick={onExit} aria-label="Exit"><XIcon size={16} /></button>
+        <button className="icon-btn" onClick={() => setExitDialog(true)} aria-label="Exit"><XIcon size={16} /></button>
         <div className="head-progress"><ProgressBar value={progress} /></div>
         <div className="head-meta mono">
           <ClockIcon size={13} />
           <span>{formatTime(elapsed)}</span>
           <span style={{ color: "var(--ink-3)" }}>{idx + 1} / {questions.length}</span>
+          {tabSwitchCount > 0 && (
+            <span style={{ color: "oklch(0.6 0.15 25)", fontSize: 11 }}>⚠ {tabSwitchCount} tab switch{tabSwitchCount !== 1 ? "es" : ""}</span>
+          )}
         </div>
       </header>
+
+      {tabAlert && (
+        <div style={{
+          position: "fixed", top: 70, left: "50%", transform: "translateX(-50%)",
+          background: "oklch(0.3 0.1 25)", color: "white", padding: "10px 20px",
+          borderRadius: 999, fontSize: 13, fontWeight: 600, zIndex: 100,
+          boxShadow: "0 4px 16px rgba(0,0,0,0.3)", animation: "fadeUp 0.3s ease",
+        }}>
+          ⚠ Tab switch detected — this question has been flagged
+        </div>
+      )}
 
       <main className="test-main" key={q.id}>
         <section className="q-pane fade-up">
           <div className="q-kind-badge eyebrow">
-            {q.kind === "fill" ? "Fill in the blank" : q.kind === "match" ? "Match pairs" : "Multiple choice"}
+            {q.kind === "fill" ? "Fill in the blank"
+              : q.kind === "match" ? "Match pairs"
+              : q.kind === "listen_choice" ? "Listening"
+              : "Multiple choice"}
           </div>
           <h2 className="serif q-prompt">{q.prompt}</h2>
 
@@ -147,11 +247,18 @@ export function TestScreen({ moduleId, onExit, onDone }: Props) {
             </blockquote>
           )}
 
-          {q.kind === "fill" && q.sentence && (
-            <FillSentence sentence={q.sentence} pick={choices.find((c: any) => c.id === selected) || null} />
+          {q.kind === "listen_choice" && displayModule?.audio_blob && (
+            <AudioPlayer src={`/api/v1/modules/${moduleId}/audio`} />
           )}
 
-          {(q.kind === "choice" || q.kind === "fill") && (
+          {q.kind === "fill" && q.sentence && (
+            <FillSentence
+              sentence={q.sentence}
+              pick={choices.find((c: any) => c.id === selected) || null}
+            />
+          )}
+
+          {(q.kind === "choice" || q.kind === "listen_choice" || q.kind === "fill") && (
             <ul className="choices">
               {choices.map((c: any, i: number) => (
                 <li key={c.id} className="choice" data-sel={selected === c.id ? true : undefined}
@@ -161,6 +268,17 @@ export function TestScreen({ moduleId, onExit, onDone }: Props) {
                 </li>
               ))}
             </ul>
+          )}
+
+          {q.kind === "fill" && choices.length === 0 && (
+            <input
+              className="fill-input"
+              placeholder="Type your answer…"
+              value={fillInput}
+              onChange={(e) => setFillInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && canSubmit && submit()}
+              autoFocus
+            />
           )}
 
           {q.kind === "match" && (
@@ -202,9 +320,46 @@ export function TestScreen({ moduleId, onExit, onDone }: Props) {
         </section>
 
         <aside className="camera-pane fade-up" style={{ animationDelay: "100ms" }}>
-          <CameraCapture ref={camRef} />
+          <CameraCapture
+            ref={camRef}
+            currentQuestionId={q.id}
+            onFaceAnomaly={handleFaceAnomaly}
+          />
         </aside>
       </main>
+
+      {exitDialog && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200,
+          display: "grid", placeItems: "center", padding: 24,
+        }}>
+          <div style={{
+            background: "var(--surface)", border: "1px solid var(--line)", borderRadius: "var(--r-xl)",
+            padding: "32px 28px", maxWidth: 400, width: "100%", boxShadow: "var(--shadow-md)",
+          }}>
+            <p className="serif" style={{ margin: "0 0 8px", fontSize: 22, letterSpacing: "-0.015em" }}>Exit this session?</p>
+            <p style={{ margin: "0 0 24px", color: "var(--ink-2)", fontSize: 14, lineHeight: 1.5 }}>
+              Your progress so far has been saved. You can come back and retry this module at any time.
+            </p>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button className="btn ghost" onClick={() => setExitDialog(false)}>Keep going</button>
+              <button className="btn" style={{ background: "oklch(0.92 0.04 25)", color: "oklch(0.35 0.1 25)", border: "1px solid oklch(0.82 0.06 25)" }}
+                onClick={async () => {
+                  setExitDialog(false);
+                  if (sessionId) {
+                    await api.sessions.logEvent(sessionId, "interrupt", {
+                      question_idx: idx,
+                      answers_submitted: answers.length,
+                    }).catch(() => {});
+                  }
+                  onExit();
+                }}>
+                Exit session
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         .test-shell { min-height:100vh; display:flex; flex-direction:column; background:var(--bg); }
@@ -224,6 +379,8 @@ export function TestScreen({ moduleId, onExit, onDone }: Props) {
         .choice-key { width:28px;height:28px; border-radius:8px; background:var(--bg-2); color:var(--ink-2); display:grid; place-items:center; font-size:12px; flex-shrink:0; border:1px solid var(--line); transition:background 0.15s,color 0.15s,border-color 0.15s; }
         .choice[data-sel] .choice-key { background:var(--accent); color:white; border-color:transparent; }
         .choice-label { flex:1; font-weight:500; font-size:15px; line-height:1.4; }
+        .fill-input { width:100%; padding:14px 16px; border:1.5px solid var(--line); border-radius:var(--r-md); font-size:16px; background:var(--bg); color:var(--ink); margin-bottom:24px; box-sizing:border-box; }
+        .fill-input:focus { outline:none; border-color:var(--accent); }
         .match-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:0 0 24px; }
         .match-col { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:8px; }
         .match-col-head { padding:0 4px 2px; font-size:10px; }
@@ -245,6 +402,61 @@ export function TestScreen({ moduleId, onExit, onDone }: Props) {
   );
 }
 
+// ─── Audio Player ─────────────────────────────────────────────────────────────
+
+function AudioPlayer({ src }: { src: string }) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [duration, setDuration] = useState(0);
+
+  const token = localStorage.getItem("access_token");
+  const srcWithToken = token ? `${src}?token=${token}` : src;
+
+  function toggle() {
+    const a = audioRef.current;
+    if (!a) return;
+    if (playing) { a.pause(); } else { a.play(); }
+    setPlaying(!playing);
+  }
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", background: "var(--accent-soft)", border: "1.5px solid color-mix(in oklch,var(--accent),white 50%)", borderRadius: "var(--r-md)", marginBottom: 20 }}>
+      <audio
+        ref={audioRef}
+        src={srcWithToken}
+        onTimeUpdate={() => {
+          const a = audioRef.current;
+          if (a && a.duration) setProgress(a.currentTime / a.duration);
+        }}
+        onLoadedMetadata={() => setDuration(audioRef.current?.duration ?? 0)}
+        onEnded={() => setPlaying(false)}
+      />
+      <button
+        onClick={toggle}
+        style={{
+          width: 38, height: 38, borderRadius: "50%", background: "var(--accent)", color: "white",
+          border: "none", cursor: "pointer", display: "grid", placeItems: "center", flexShrink: 0,
+          fontSize: 14,
+        }}
+      >
+        {playing ? "⏸" : "▶"}
+      </button>
+      <div style={{ flex: 1 }}>
+        <div style={{ height: 4, background: "color-mix(in oklch,var(--accent),white 60%)", borderRadius: 999, overflow: "hidden" }}>
+          <div style={{ height: "100%", width: `${progress * 100}%`, background: "var(--accent)", borderRadius: 999, transition: "width 0.2s linear" }} />
+        </div>
+        <div style={{ fontSize: 11, color: "var(--accent-ink)", marginTop: 4, fontVariantNumeric: "tabular-nums" }}>
+          {duration > 0 ? `${formatTime(progress * duration * 1000)} / ${formatTime(duration * 1000)}` : "Loading audio…"}
+        </div>
+      </div>
+      <span className="mono" style={{ fontSize: 10, color: "var(--accent-ink)" }}>AUDIO</span>
+    </div>
+  );
+}
+
+// ─── FillSentence ─────────────────────────────────────────────────────────────
+
 function FillSentence({ sentence, pick }: { sentence: string; pick: any }) {
   const parts = sentence.split("__");
   return (
@@ -258,24 +470,31 @@ function FillSentence({ sentence, pick }: { sentence: string; pick: any }) {
   );
 }
 
-// Expose stopAndUpload imperatively so TestScreen can await it before navigation
-const CameraCapture = forwardRef<{ stopAndUpload: (sessionId: string) => Promise<void> }>(function CameraCapture(_, ref) {
+// ─── CameraCapture ────────────────────────────────────────────────────────────
+
+const CameraCapture = forwardRef<
+  { stopAndUpload: (sessionId: string) => Promise<void>; onFaceAnomaly: (questionId: string) => void },
+  { currentQuestionId: string; onFaceAnomaly: (questionId: string) => void }
+>(function CameraCapture({ currentQuestionId, onFaceAnomaly }, ref) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
+  const currentQIdRef = useRef(currentQuestionId);
+  useEffect(() => { currentQIdRef.current = currentQuestionId; }, [currentQuestionId]);
 
   type CamStatus = "loading" | "active" | "blocked" | "insecure" | "unavailable" | "uploading" | "done";
   const [status, setStatus] = useState<CamStatus>("loading");
   const [faceCount, setFaceCount] = useState<number | null>(null);
+  const [gazeOk, setGazeOk] = useState<boolean | null>(null);
   const [faceDetAvail, setFaceDetAvail] = useState<boolean | null>(null);
+  const [faceAlert, setFaceAlert] = useState(false);
   const [consent, setConsent] = useState<"pending" | "granted" | "declined">(
     () => (localStorage.getItem("cam_consent") as any) || "pending"
   );
   const [blockReason, setBlockReason] = useState<"browser" | "os" | "">("");
   const [retryCount, setRetryCount] = useState(0);
 
-  // Expose stopAndUpload to parent via ref
   useImperativeHandle(ref, () => ({
     stopAndUpload: async (sessionId: string) => {
       const recorder = recorderRef.current;
@@ -301,9 +520,9 @@ const CameraCapture = forwardRef<{ stopAndUpload: (sessionId: string) => Promise
         recorder.stop();
       });
     },
+    onFaceAnomaly,
   }));
 
-  // Attach stream to video element AFTER it mounts (status becomes "active")
   useEffect(() => {
     if (status === "active" && videoRef.current && streamRef.current) {
       videoRef.current.srcObject = streamRef.current;
@@ -313,8 +532,6 @@ const CameraCapture = forwardRef<{ stopAndUpload: (sessionId: string) => Promise
 
   useEffect(() => {
     if (consent !== "granted") return;
-
-    // Insecure context — camera is blocked by the browser spec
     if (!window.isSecureContext || !navigator.mediaDevices) {
       setStatus("insecure");
       return;
@@ -328,28 +545,56 @@ const CameraCapture = forwardRef<{ stopAndUpload: (sessionId: string) => Promise
         setStatus("active");
 
         const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
-          ? "video/webm;codecs=vp9"
-          : "video/webm";
+          ? "video/webm;codecs=vp9" : "video/webm";
         const recorder = new MediaRecorder(stream, { mimeType });
         recorderRef.current = recorder;
         recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
         recorder.start(5000);
 
-        // face-api.js — works in all browsers without flags
+        // Load face-api weights from local public folder (no CDN dependency)
         import("face-api.js").then(async (faceapi) => {
           try {
-            await faceapi.nets.tinyFaceDetector.loadFromUri(
-              "https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights"
-            );
+            await Promise.all([
+              faceapi.nets.tinyFaceDetector.loadFromUri("/face-api-weights"),
+              faceapi.nets.faceLandmark68Net.loadFromUri("/face-api-weights"),
+            ]);
             setFaceDetAvail(true);
             faceTimer = setInterval(async () => {
               if (!videoRef.current || videoRef.current.readyState < 2) return;
               try {
-                const detections = await faceapi.detectAllFaces(
-                  videoRef.current,
-                  new faceapi.TinyFaceDetectorOptions({ scoreThreshold: 0.5 })
-                );
-                setFaceCount(detections.length);
+                const results = await faceapi
+                  .detectAllFaces(videoRef.current, new faceapi.TinyFaceDetectorOptions({ scoreThreshold: 0.5 }))
+                  .withFaceLandmarks();
+                const count = results.length;
+                setFaceCount(count);
+
+                let anomaly = count !== 1;
+                let gazeGood = count === 1;
+
+                // Gaze check — if exactly one face, verify eyes are roughly centred
+                if (count === 1) {
+                  const lms = results[0].landmarks;
+                  const box = results[0].detection.box;
+                  const leftEye = lms.getLeftEye();
+                  const rightEye = lms.getRightEye();
+                  const allEye = [...leftEye, ...rightEye];
+                  const eyeCX = allEye.reduce((s, p) => s + p.x, 0) / allEye.length;
+                  const eyeCY = allEye.reduce((s, p) => s + p.y, 0) / allEye.length;
+                  const nx = (eyeCX - box.x) / box.width;
+                  const ny = (eyeCY - box.y) / box.height;
+                  if (nx < 0.2 || nx > 0.8 || ny < 0.15 || ny > 0.6) {
+                    anomaly = true;
+                    gazeGood = false;
+                  }
+                }
+
+                setGazeOk(gazeGood);
+
+                if (anomaly) {
+                  onFaceAnomaly(currentQIdRef.current);
+                  setFaceAlert(true);
+                  setTimeout(() => setFaceAlert(false), 3000);
+                }
               } catch {}
             }, 2000);
           } catch {
@@ -376,13 +621,10 @@ const CameraCapture = forwardRef<{ stopAndUpload: (sessionId: string) => Promise
     };
   }, [consent, retryCount]);
 
-  // ── Consent pending ──────────────────────────────────────────────────────
   if (consent === "pending") {
     return (
       <div className="cam-card">
-        <div className="cam-head">
-          <span className="eyebrow">Camera · proctoring</span>
-        </div>
+        <div className="cam-head"><span className="eyebrow">Camera · proctoring</span></div>
         <div className="cam-empty" style={{ gap: 14, padding: "28px 18px" }}>
           <div style={{ width: 48, height: 48, borderRadius: "50%", background: "var(--bg-2)", display: "grid", placeItems: "center", color: "var(--ink-3)" }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
@@ -401,37 +643,23 @@ const CameraCapture = forwardRef<{ stopAndUpload: (sessionId: string) => Promise
     );
   }
 
-  // ── Declined by user ─────────────────────────────────────────────────────
   if (consent === "declined") {
     return (
       <div className="cam-card">
-        <div className="cam-head">
-          <span className="eyebrow">Camera · proctoring</span>
-          <CamBadge label="OFF" color="neutral" />
-        </div>
+        <div className="cam-head"><span className="eyebrow">Camera · proctoring</span><CamBadge label="OFF" color="neutral" /></div>
         <div className="cam-empty" style={{ padding: "20px 16px", gap: 10 }}>
-          <p style={{ margin: 0, color: "var(--ink-3)", fontSize: 13, textAlign: "center" }}>
-            Recording declined. Your session continues without a recording.
-          </p>
-          <button className="btn ghost" style={{ fontSize: 12 }} onClick={() => {
-            localStorage.removeItem("cam_consent");
-            setConsent("pending");
-            setStatus("loading");
-          }}>Change mind</button>
+          <p style={{ margin: 0, color: "var(--ink-3)", fontSize: 13, textAlign: "center" }}>Recording declined. Your session continues without a recording.</p>
+          <button className="btn ghost" style={{ fontSize: 12 }} onClick={() => { localStorage.removeItem("cam_consent"); setConsent("pending"); setStatus("loading"); }}>Change mind</button>
         </div>
         <CamStyle />
       </div>
     );
   }
 
-  // ── Insecure context ─────────────────────────────────────────────────────
   if (status === "insecure") {
     return (
       <div className="cam-card">
-        <div className="cam-head">
-          <span className="eyebrow">Camera · proctoring</span>
-          <CamBadge label="HTTPS required" color="warn" />
-        </div>
+        <div className="cam-head"><span className="eyebrow">Camera · proctoring</span><CamBadge label="HTTPS required" color="warn" /></div>
         <div className="cam-empty" style={{ padding: "20px 16px", gap: 10 }}>
           <p style={{ margin: 0, color: "var(--ink-2)", fontSize: 13, textAlign: "center", lineHeight: 1.5 }}>
             Camera requires a secure connection. Open the app via <strong>localhost:5173</strong> or enable HTTPS.
@@ -442,55 +670,38 @@ const CameraCapture = forwardRef<{ stopAndUpload: (sessionId: string) => Promise
     );
   }
 
-  // ── Blocked by browser permissions ───────────────────────────────────────
   if (status === "blocked") {
     return (
       <div className="cam-card">
-        <div className="cam-head">
-          <span className="eyebrow">Camera · proctoring</span>
-          <CamBadge label="BLOCKED" color="warn" />
-        </div>
+        <div className="cam-head"><span className="eyebrow">Camera · proctoring</span><CamBadge label="BLOCKED" color="warn" /></div>
         <div className="cam-empty" style={{ padding: "20px 16px", gap: 10 }}>
           <p style={{ margin: 0, color: "var(--ink-2)", fontSize: 13, textAlign: "center", lineHeight: 1.5 }}>
             {blockReason === "browser"
               ? "Camera blocked by browser. Click the camera icon in the address bar to allow access, then refresh."
               : "Camera could not start. Check your system camera permissions."}
           </p>
-          <button className="btn ghost" style={{ fontSize: 12 }} onClick={() => {
-            localStorage.removeItem("cam_consent");
-            setConsent("pending");
-            setStatus("loading");
-            setBlockReason("");
-          }}>Try again</button>
+          <button className="btn ghost" style={{ fontSize: 12 }} onClick={() => { localStorage.removeItem("cam_consent"); setConsent("pending"); setStatus("loading"); setBlockReason(""); }}>Try again</button>
         </div>
         <CamStyle />
       </div>
     );
   }
 
-  // ── No camera device ─────────────────────────────────────────────────────
   if (status === "unavailable") {
     return (
       <div className="cam-card">
-        <div className="cam-head">
-          <span className="eyebrow">Camera · proctoring</span>
-          <CamBadge label="NO CAMERA" color="neutral" />
-        </div>
+        <div className="cam-head"><span className="eyebrow">Camera · proctoring</span><CamBadge label="NO CAMERA" color="neutral" /></div>
         <div className="cam-empty" style={{ padding: "20px 16px", gap: 10 }}>
           <p style={{ margin: 0, color: "var(--ink-3)", fontSize: 13, textAlign: "center", lineHeight: 1.5 }}>
             No camera found. Check that your camera is connected and that the browser has camera permission.
           </p>
-          <button className="btn ghost" style={{ fontSize: 12 }} onClick={() => {
-            setStatus("loading");
-            setRetryCount((c) => c + 1);
-          }}>Retry</button>
+          <button className="btn ghost" style={{ fontSize: 12 }} onClick={() => { setStatus("loading"); setRetryCount((c) => c + 1); }}>Retry</button>
         </div>
         <CamStyle />
       </div>
     );
   }
 
-  // ── Active / uploading / done ─────────────────────────────────────────────
   return (
     <div className="cam-card">
       <div className="cam-head">
@@ -501,17 +712,23 @@ const CameraCapture = forwardRef<{ stopAndUpload: (sessionId: string) => Promise
         />
       </div>
 
-      {status === "loading" && (
-        <div className="cam-empty"><div className="dot-load"><i /><i /><i /></div></div>
-      )}
+      {status === "loading" && <div className="cam-empty"><div className="dot-load"><i /><i /><i /></div></div>}
 
       {(status === "active" || status === "uploading" || status === "done") && (
         <div style={{ position: "relative", borderRadius: "var(--r-lg)", overflow: "hidden", background: "#000", lineHeight: 0 }}>
           <video ref={videoRef} autoPlay muted playsInline style={{ width: "100%", display: "block", maxHeight: 220, objectFit: "cover" }} />
+          {faceAlert && (
+            <div style={{ position: "absolute", top: 8, left: 8, right: 8, background: "rgba(220,30,30,0.85)", padding: "5px 10px", borderRadius: 8, fontSize: 11, color: "white", textAlign: "center", fontWeight: 600 }}>
+              ⚠ {faceCount === 0 ? "No face detected" : faceCount && faceCount > 1 ? "Multiple faces detected" : "Please look at the screen"}
+            </div>
+          )}
           {faceDetAvail === true && faceCount !== null && (
-            <div style={{ position: "absolute", bottom: 8, left: 8, display: "flex", alignItems: "center", gap: 6, background: "rgba(0,0,0,0.65)", padding: "4px 10px", borderRadius: 999, fontSize: 11, color: faceCount === 1 ? "#4ade80" : "#f87171", backdropFilter: "blur(4px)" }}>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: faceCount === 1 ? "#4ade80" : "#f87171", display: "inline-block", flexShrink: 0 }} />
-              {faceCount === 1 ? "Face detected" : faceCount === 0 ? "No face detected" : `${faceCount} faces`}
+            <div style={{ position: "absolute", bottom: 8, left: 8, display: "flex", alignItems: "center", gap: 6, background: "rgba(0,0,0,0.65)", padding: "4px 10px", borderRadius: 999, fontSize: 11, backdropFilter: "blur(4px)", color: faceCount === 1 && gazeOk ? "#4ade80" : "#f87171" }}>
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: faceCount === 1 && gazeOk ? "#4ade80" : "#f87171", display: "inline-block", flexShrink: 0 }} />
+              {faceCount === 0 ? "No face detected"
+                : faceCount > 1 ? `${faceCount} faces`
+                : gazeOk ? "Face · looking at screen"
+                : "Face · looking away"}
             </div>
           )}
           {faceDetAvail === false && (
@@ -521,7 +738,6 @@ const CameraCapture = forwardRef<{ stopAndUpload: (sessionId: string) => Promise
           )}
         </div>
       )}
-
       <CamStyle />
     </div>
   );

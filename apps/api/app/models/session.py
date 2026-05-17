@@ -25,6 +25,9 @@ class Session(Base):
     flagged: Mapped[bool] = mapped_column(Boolean, default=False)
     flag_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     xp_earned: Mapped[int] = mapped_column(Integer, default=0)
+    admin_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tab_switch_count: Mapped[int] = mapped_column(Integer, default=0)
+    face_anomaly_count: Mapped[int] = mapped_column(Integer, default=0)
 
     user: Mapped["User"] = relationship("User", back_populates="sessions", lazy="noload")
     module: Mapped["Module"] = relationship("Module", back_populates="sessions", lazy="noload")
@@ -40,8 +43,23 @@ class SessionAnswer(Base):
     selection: Mapped[dict] = mapped_column(JSON, nullable=False)
     is_correct: Mapped[bool] = mapped_column(Boolean, nullable=False)
     time_spent_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    flagged: Mapped[bool] = mapped_column(Boolean, default=False)
+    admin_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tab_switch: Mapped[bool] = mapped_column(Boolean, default=False)
+    face_anomaly: Mapped[bool] = mapped_column(Boolean, default=False)
 
     session: Mapped["Session"] = relationship("Session", back_populates="answers", lazy="noload")
+
+
+class SessionEvent(Base):
+    __tablename__ = "english_session_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    session_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("english_sessions.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("english_users.id", ondelete="CASCADE"), nullable=False, index=True)
+    event_type: Mapped[str] = mapped_column(String, nullable=False)
+    event_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 from app.models.user import User  # noqa: E402

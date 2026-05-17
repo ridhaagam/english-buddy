@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.deps import AdminUser
 from app.models.module import Module
-from app.models.session import Session, SessionAnswer
+from app.models.session import Session, SessionAnswer, SessionEvent
 from app.models.user import User
 
 router = APIRouter(prefix="/admin/recordings", tags=["admin-recordings"])
@@ -17,6 +17,11 @@ router = APIRouter(prefix="/admin/recordings", tags=["admin-recordings"])
 
 class FlagBody(BaseModel):
     reason: str | None = None
+
+
+class AnswerFlagBody(BaseModel):
+    flagged: bool
+    admin_comment: str | None = None
 
 
 @router.get("")
@@ -68,6 +73,8 @@ async def list_recordings(
             "recording_blob": s.recording_blob,
             "flagged": s.flagged,
             "flag_reason": s.flag_reason,
+            "tab_switch_count": s.tab_switch_count,
+            "face_anomaly_count": s.face_anomaly_count,
             "finished_at": s.finished_at.isoformat() if s.finished_at else None,
         }
         for s, u, m in rows
@@ -146,6 +153,9 @@ async def get_recording(
         "recording_blob": s.recording_blob,
         "flagged": s.flagged,
         "flag_reason": s.flag_reason,
+        "admin_comment": s.admin_comment,
+        "tab_switch_count": s.tab_switch_count,
+        "face_anomaly_count": s.face_anomaly_count,
         "finished_at": s.finished_at.isoformat() if s.finished_at else None,
         "answers": [
             {
@@ -156,6 +166,10 @@ async def get_recording(
                 "selection": a.selection,
                 "is_correct": a.is_correct,
                 "time_spent_ms": a.time_spent_ms,
+                "flagged": a.flagged,
+                "admin_comment": a.admin_comment,
+                "tab_switch": a.tab_switch,
+                "face_anomaly": a.face_anomaly,
             }
             for a, q in answers
         ],
@@ -213,6 +227,35 @@ async def stream_recording(
     return FileResponse(path, media_type="video/webm")
 
 
+@router.patch("/{recording_id}/answers/{question_id}/flag")
+async def flag_answer(
+    recording_id: UUID,
+    question_id: UUID,
+    body: AnswerFlagBody,
+    user: AdminUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    from sqlalchemy import and_
+    result = await db.execute(
+        select(SessionAnswer).where(
+            and_(SessionAnswer.session_id == recording_id, SessionAnswer.question_id == question_id)
+        )
+    )
+    ans = result.scalar_one_or_none()
+    if not ans:
+        raise HTTPException(404, "Answer not found")
+    ans.flagged = body.flagged
+    ans.admin_comment = body.admin_comment
+    from app.api.admin.audit import write_log
+    await write_log(
+        db, actor_id=user.id, action="flag_answer", target_kind="session_answer",
+        target_id=f"{recording_id}/{question_id}",
+        payload={"flagged": body.flagged, "comment": body.admin_comment},
+    )
+    await db.commit()
+    return {"ok": True}
+
+
 @router.post("/{recording_id}/flag")
 async def flag_recording(
     recording_id: UUID,
@@ -230,6 +273,30 @@ async def flag_recording(
     await write_log(db, actor_id=user.id, action="flag_recording", target_kind="session", target_id=str(recording_id), payload={"reason": body.reason})
     await db.commit()
     return {"ok": True}
+
+
+@router.get("/{recording_id}/events")
+async def get_session_events(
+    recording_id: UUID,
+    user: AdminUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Return admin log of open/interrupt/close events for a session."""
+    result = await db.execute(
+        select(SessionEvent)
+        .where(SessionEvent.session_id == recording_id)
+        .order_by(SessionEvent.created_at.asc())
+    )
+    events = result.scalars().all()
+    return [
+        {
+            "id": str(e.id),
+            "event_type": e.event_type,
+            "event_data": e.event_data,
+            "created_at": e.created_at.isoformat(),
+        }
+        for e in events
+    ]
 
 
 @router.delete("/{recording_id}/flag")

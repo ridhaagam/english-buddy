@@ -46,6 +46,18 @@ class ModuleOut(BaseModel):
     avg_score: int
     updated_at: str
     created_by: str | None
+    deadline: str | None = None
+    is_closed: bool = False
+    max_attempts: int | None = None
+    reveal_at: str | None = None
+
+
+class ModuleSettingsBody(BaseModel):
+    deadline: str | None = None
+    is_closed: bool = False
+    max_attempts: int | None = None
+    show_answers_after_deadline: bool = True
+    reveal_at: str | None = None
 
 
 @router.get("", response_model=list[ModuleOut])
@@ -90,6 +102,10 @@ async def list_all_modules(
             avg_score=round(float(srow[1] or 0)),
             updated_at=m.updated_at.isoformat(),
             created_by=str(m.created_by) if m.created_by else None,
+            deadline=m.deadline.isoformat() if m.deadline else None,
+            is_closed=m.is_closed,
+            max_attempts=m.max_attempts,
+            reveal_at=m.reveal_at.isoformat() if m.reveal_at else None,
         ))
     return out
 
@@ -126,6 +142,32 @@ async def create_module(
         db.add(question)
 
     return {"id": str(m.id)}
+
+
+@router.patch("/{module_id}/settings")
+async def update_module_settings(
+    module_id: UUID,
+    body: ModuleSettingsBody,
+    user: AdminUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    result = await db.execute(select(Module).where(Module.id == module_id))
+    m = result.scalar_one_or_none()
+    if not m:
+        raise HTTPException(404, "Module not found")
+
+    from datetime import datetime, timezone as _tz
+    m.deadline = datetime.fromisoformat(body.deadline).replace(tzinfo=_tz.utc) if body.deadline else None
+    m.reveal_at = datetime.fromisoformat(body.reveal_at).replace(tzinfo=_tz.utc) if body.reveal_at else None
+    m.is_closed = body.is_closed
+    m.max_attempts = body.max_attempts
+    m.show_answers_after_deadline = body.show_answers_after_deadline
+
+    from app.api.admin.audit import write_log
+    await write_log(db, actor_id=user.id, action="update_module_settings", target_kind="module", target_id=str(module_id),
+                    payload={"is_closed": body.is_closed, "max_attempts": body.max_attempts, "deadline": body.deadline})
+    await db.commit()
+    return {"id": str(m.id), "is_closed": m.is_closed, "max_attempts": m.max_attempts}
 
 
 @router.patch("/{module_id}")

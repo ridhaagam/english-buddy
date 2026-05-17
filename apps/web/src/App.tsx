@@ -15,9 +15,11 @@ import { AdminRecordings } from "./features/admin/recordings/AdminRecordings";
 import { AdminReports } from "./features/admin/reports/AdminReports";
 import { AdminUsers } from "./features/admin/users/AdminUsers";
 import { AdminAuditLog } from "./features/admin/audit-log/AdminAuditLog";
+import { ProfileEditPage } from "./features/profile/ProfileEditPage";
+import { SessionDetailPage } from "./features/practice/SessionDetailPage";
 import { api } from "./lib/api";
 
-type AppRoute = "profile" | "library" | "practice" | "test" | "results" | "admin";
+type AppRoute = "profile" | "library" | "practice" | "test" | "results" | "admin" | "profile-edit" | "session-detail";
 
 export function App() {
   const [user, setUser] = useState<any>(null);
@@ -26,6 +28,7 @@ export function App() {
   const [testModuleId, setTestModuleId] = useState<string | undefined>(undefined);
   const [result, setResult] = useState<any>(null);
   const [adminMode, setAdminMode] = useState(false);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     const token = localStorage.getItem("access_token");
@@ -142,7 +145,24 @@ export function App() {
           <LibraryScreen onStartTest={(id) => startTest(id)} />
         )}
         {route === "practice" && (
-          <PracticeScreen onStartTest={(id) => startTest(id)} />
+          <PracticeScreen
+            onStartTest={(id) => startTest(id)}
+            onViewSession={(id) => { setSelectedSessionId(id); setRoute("session-detail"); }}
+          />
+        )}
+        {route === "session-detail" && selectedSessionId && (
+          <SessionDetailPage
+            sessionId={selectedSessionId}
+            onBack={() => setRoute("practice")}
+            onPracticeAgain={(moduleId) => startTest(moduleId)}
+          />
+        )}
+        {route === "profile-edit" && (
+          <ProfileEditPage
+            user={user}
+            onBack={() => setRoute("profile")}
+            onUserUpdate={(u) => setUser(u)}
+          />
         )}
       </div>
       <style>{`
