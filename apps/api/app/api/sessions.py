@@ -1,16 +1,23 @@
-from datetime import datetime, timezone
+import logging
+from datetime import date, datetime, timezone
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Body, Depends, File, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
-from sqlalchemy import and_, select
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.deps import CurrentUser
-from app.models.module import Module, ModuleStatus
+from app.core.security import create_access_token, decode_token
+from app.models.module import Module, ModuleStatus, TopicType
+from app.models.question import Question
 from app.models.session import Session, SessionAnswer
+from app.services.storage import get_file_path, object_exists, put_object
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["sessions"])
 
@@ -27,6 +34,15 @@ class AnswerBody(BaseModel):
 
 class FinishBody(BaseModel):
     timezone: str | None = None
+
+
+async def _get_owned_session(
+    db: AsyncSession, session_id: UUID, user_id: UUID
+) -> Session | None:
+    result = await db.execute(
+        select(Session).where(and_(Session.id == session_id, Session.user_id == user_id))
+    )
+    return result.scalar_one_or_none()
 
 
 @router.post("/sessions", status_code=201)
@@ -89,16 +105,11 @@ async def get_my_session_play_url(
     user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    result = await db.execute(
-        select(Session).where(and_(Session.id == session_id, Session.user_id == user.id))
-    )
-    s = result.scalar_one_or_none()
+    s = await _get_owned_session(db, session_id, user.id)
     if not s or not s.recording_blob:
         raise HTTPException(404, "Recording not found")
-    from app.services.storage import object_exists
     if not object_exists(s.recording_blob):
         raise HTTPException(404, "Recording file not found")
-    from app.core.security import create_access_token
     stream_token = create_access_token(str(user.id), user.role.value)
     return {"url": f"/api/v1/sessions/{session_id}/stream?token={stream_token}"}
 
@@ -123,7 +134,6 @@ async def get_my_session(
     )
     answers = ans_r.scalars().all()
 
-    from app.models.question import Question
     qs_r = await db.execute(
         select(Question).where(Question.module_id == session.module_id).order_by(Question.position)
     )
@@ -160,16 +170,12 @@ async def submit_answer(
     user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    result = await db.execute(
-        select(Session).where(and_(Session.id == session_id, Session.user_id == user.id))
-    )
-    session = result.scalar_one_or_none()
+    session = await _get_owned_session(db, session_id, user.id)
     if not session:
         raise HTTPException(404, "Session not found")
     if session.finished_at:
         raise HTTPException(400, "Session already finished")
 
-    from app.models.question import Question
     q_r = await db.execute(select(Question).where(Question.id == UUID(body.question_id)))
     question = q_r.scalar_one_or_none()
     if not question:
@@ -206,14 +212,11 @@ async def submit_answer(
 @router.post("/sessions/{session_id}/finish")
 async def finish_session(
     session_id: UUID,
-    body: FinishBody,
     user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
+    body: FinishBody | None = Body(default=None),
 ):
-    result = await db.execute(
-        select(Session).where(and_(Session.id == session_id, Session.user_id == user.id))
-    )
-    session = result.scalar_one_or_none()
+    session = await _get_owned_session(db, session_id, user.id)
     if not session:
         raise HTTPException(404, "Session not found")
     if session.finished_at:
@@ -223,7 +226,6 @@ async def finish_session(
         select(SessionAnswer).where(SessionAnswer.session_id == session_id)
     )
     answers = ans_r.scalars().all()
-    from app.models.question import Question
     total_r = await db.execute(
         select(Question).where(Question.module_id == session.module_id)
     )
@@ -246,7 +248,6 @@ async def finish_session(
     await db.refresh(user)  # re-read latest xp_total before adding (avoids stale concurrent updates)
     user.xp_total += xp
 
-    from datetime import date
     today = date.today()
     if user.last_seen_at:
         last_day = user.last_seen_at.date() if hasattr(user.last_seen_at, 'date') else today
@@ -275,10 +276,7 @@ async def upload_recording_chunk(
     db: Annotated[AsyncSession, Depends(get_db)],
     chunk: UploadFile = File(...),
 ):
-    result = await db.execute(
-        select(Session).where(and_(Session.id == session_id, Session.user_id == user.id))
-    )
-    session = result.scalar_one_or_none()
+    session = await _get_owned_session(db, session_id, user.id)
     if not session:
         raise HTTPException(404, "Session not found")
 
@@ -287,12 +285,10 @@ async def upload_recording_chunk(
         return
 
     key = f"recordings/{session_id}.webm"
-    import logging
     try:
-        from app.services.storage import put_object
         put_object(key, data, "video/webm")
     except Exception:
-        logging.getLogger(__name__).exception("Storage write failed for session %s", session_id)
+        logger.exception("Storage write failed for session %s", session_id)
         raise HTTPException(500, "Failed to save recording")
     session.recording_blob = key
     await db.commit()
@@ -304,19 +300,12 @@ async def stream_recording(
     token: str,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    from fastapi.responses import FileResponse
-    from app.core.security import decode_token
-    from app.services.storage import get_file_path
-
     payload = decode_token(token)
     if not payload:
         raise HTTPException(401, "Invalid token")
     user_id = UUID(payload.get("sub"))
 
-    result = await db.execute(
-        select(Session).where(and_(Session.id == session_id, Session.user_id == user_id))
-    )
-    s = result.scalar_one_or_none()
+    s = await _get_owned_session(db, session_id, user_id)
     if not s or not s.recording_blob:
         raise HTTPException(404, "Recording not found")
 
@@ -333,7 +322,6 @@ async def get_library(
     topic: str | None = None,
     level: str | None = None,
 ):
-    from app.models.module import TopicType
     q = select(Module).where(Module.status == ModuleStatus.published)
     if topic and topic.lower() != "all":
         try:
@@ -347,8 +335,6 @@ async def get_library(
 
     out = []
     for m in modules:
-        from app.models.question import Question
-        from sqlalchemy import func
         qc = await db.execute(select(func.count()).where(Question.module_id == m.id))
         questions_count = qc.scalar() or 0
 

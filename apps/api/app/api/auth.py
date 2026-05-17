@@ -1,7 +1,8 @@
 from datetime import datetime, timezone
 from typing import Annotated
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -70,7 +71,6 @@ async def refresh_token(body: RefreshBody, db: Annotated[AsyncSession, Depends(g
     payload = decode_token(body.refresh)
     if not payload or payload.get("type") != "refresh":
         raise HTTPException(status_code=401, detail="Invalid refresh token")
-    from uuid import UUID
     result = await db.execute(select(User).where(User.id == UUID(payload["sub"])))
     user = result.scalar_one_or_none()
     if not user:
