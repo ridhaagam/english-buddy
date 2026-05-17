@@ -17,6 +17,7 @@ router = APIRouter(prefix="/admin/modules", tags=["admin-modules"])
 
 
 class QuestionIn(BaseModel):
+    id: str | None = None
     kind: str
     prompt: str
     context: str | None = None
@@ -190,21 +191,65 @@ async def update_module(
     m.status = ModuleStatus(body.status)
     m.description = body.description
 
-    await db.execute(
-        Question.__table__.delete().where(Question.module_id == module_id)
+    from app.models.session import SessionAnswer
+
+    # Load existing questions into ORM identity map
+    existing_result = await db.execute(
+        select(Question).where(Question.module_id == module_id)
     )
-    for i, q in enumerate(body.questions):
-        question = Question(
-            module_id=m.id,
-            position=i,
-            kind=QuestionKind(q.kind),
-            prompt=q.prompt,
-            context=q.context,
-            sentence=q.sentence,
-            payload=q.payload,
-            explain=q.explain,
+    existing_qs: dict = {q.id: q for q in existing_result.scalars()}
+
+    # Determine which question IDs the body wants to keep/update
+    body_ids: set = set()
+    for q in body.questions:
+        if q.id:
+            try:
+                body_ids.add(UUID(q.id))
+            except (ValueError, AttributeError):
+                pass
+
+    # Delete questions removed from the body — skip those referenced by session answers
+    removed_ids = set(existing_qs.keys()) - body_ids
+    if removed_ids:
+        ans_result = await db.execute(
+            select(SessionAnswer.question_id)
+            .where(SessionAnswer.question_id.in_(list(removed_ids)))
+            .distinct()
         )
-        db.add(question)
+        ids_with_answers = set(ans_result.scalars())
+        for qid in removed_ids:
+            if qid not in ids_with_answers:
+                await db.delete(existing_qs[qid])
+
+    # Upsert: update existing questions in-place, insert new ones
+    for i, q in enumerate(body.questions):
+        q_uuid = None
+        if q.id:
+            try:
+                q_uuid = UUID(q.id)
+            except (ValueError, AttributeError):
+                pass
+
+        if q_uuid and q_uuid in existing_qs:
+            eq = existing_qs[q_uuid]
+            eq.position = i
+            eq.kind = QuestionKind(q.kind)
+            eq.prompt = q.prompt
+            eq.context = q.context
+            eq.sentence = q.sentence
+            eq.payload = q.payload
+            eq.explain = q.explain
+        else:
+            db.add(Question(
+                module_id=m.id,
+                position=i,
+                kind=QuestionKind(q.kind),
+                prompt=q.prompt,
+                context=q.context,
+                sentence=q.sentence,
+                payload=q.payload,
+                explain=q.explain,
+            ))
 
     return {"id": str(m.id)}
 

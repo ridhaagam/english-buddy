@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PlusIcon, EditIcon, TrashIcon, XIcon, ArrowRightIcon } from "../../../components/ui";
 import { api } from "../../../lib/api";
@@ -32,6 +32,7 @@ export function AdminModules() {
   const [open, setOpen] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [editing, setEditing] = useState<any>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [form, setForm] = useState<ModuleForm>(blank);
   const [settings, setSettings] = useState<Settings>(blankSettings);
   const [qIdx, setQIdx] = useState<number | null>(null);
@@ -136,7 +137,6 @@ export function AdminModules() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Delete this module?")) return;
     try {
       await api.admin.modules.delete(id);
       qc.invalidateQueries({ queryKey: ["admin-modules"] });
@@ -180,46 +180,72 @@ export function AdminModules() {
           </thead>
           <tbody>
             {(modules as any[]).map((m: any) => (
-              <tr key={m.id} style={{ borderBottom: "1px solid var(--line-2)" }}>
-                <td data-label="Title" style={tdStyle}><span style={{ fontWeight: 600 }}>{m.title}</span></td>
-                <td data-label="Topic" style={tdStyle}><span className="mono" style={{ fontSize: 11, textTransform: "capitalize", padding: "3px 8px", borderRadius: 999, background: "var(--bg-2)", color: "var(--ink-2)", border: "1px solid var(--line)" }}>{m.topic}</span></td>
-                <td data-label="Level" style={tdStyle}><span className="mono" style={{ fontSize: 12 }}>{m.cefr_level}</span></td>
-                <td data-label="Questions" style={tdStyle}>{m.questions_count ?? 0}</td>
-                <td data-label="Status" style={tdStyle}>
-                  <span className="mono" style={{ fontSize: 11, padding: "3px 8px", borderRadius: 999, background: m.status === "published" ? "var(--accent-soft)" : "var(--bg-2)", color: m.status === "published" ? "var(--accent-ink)" : "var(--ink-3)", border: "1px solid var(--line)" }}>
-                    {m.status}
-                  </span>
-                </td>
-                <td data-label="Access" style={tdStyle}>
-                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                    {m.is_closed && (
-                      <span className="mono" style={{ fontSize: 10, padding: "2px 6px", borderRadius: 999, background: "oklch(0.93 0.06 25)", color: "oklch(0.45 0.1 25)", border: "1px solid oklch(0.85 0.06 25)" }}>CLOSED</span>
-                    )}
-                    {m.deadline && !m.is_closed && (
-                      <span className="mono" style={{ fontSize: 10, padding: "2px 6px", borderRadius: 999, background: "oklch(0.93 0.04 85)", color: "oklch(0.45 0.1 85)", border: "1px solid oklch(0.88 0.06 85)" }}>
-                        Due {new Date(m.deadline).toLocaleDateString()}
-                      </span>
-                    )}
-                    {m.max_attempts && (
-                      <span className="mono" style={{ fontSize: 10, padding: "2px 6px", borderRadius: 999, background: "var(--bg-2)", color: "var(--ink-3)", border: "1px solid var(--line)" }}>
-                        Max {m.max_attempts}
-                      </span>
-                    )}
-                    {!m.is_closed && !m.deadline && !m.max_attempts && (
-                      <span style={{ color: "var(--ink-3)", fontSize: 12 }}>Open</span>
-                    )}
-                  </div>
-                </td>
-                <td style={{ ...tdStyle, textAlign: "right" }}>
-                  <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-                    {m.status !== "published" && (
-                      <button className="btn ghost sm" onClick={() => handlePublish(m.id)}>Publish</button>
-                    )}
-                    <button className="icon-btn" onClick={() => openEdit(m)}><EditIcon size={14} /></button>
-                    <button className="icon-btn" onClick={() => handleDelete(m.id)}><TrashIcon size={14} /></button>
-                  </div>
-                </td>
-              </tr>
+              <Fragment key={m.id}>
+                <tr style={{ borderBottom: confirmDeleteId === m.id ? "none" : "1px solid var(--line-2)" }}>
+                  <td data-label="Title" style={tdStyle}><span style={{ fontWeight: 600 }}>{m.title}</span></td>
+                  <td data-label="Topic" style={tdStyle}><span className="mono" style={{ fontSize: 11, textTransform: "capitalize", padding: "3px 8px", borderRadius: 999, background: "var(--bg-2)", color: "var(--ink-2)", border: "1px solid var(--line)" }}>{m.topic}</span></td>
+                  <td data-label="Level" style={tdStyle}><span className="mono" style={{ fontSize: 12 }}>{m.cefr_level}</span></td>
+                  <td data-label="Questions" style={tdStyle}>{m.questions_count ?? 0}</td>
+                  <td data-label="Status" style={tdStyle}>
+                    <span className="mono" style={{ fontSize: 11, padding: "3px 8px", borderRadius: 999, background: m.status === "published" ? "var(--accent-soft)" : "var(--bg-2)", color: m.status === "published" ? "var(--accent-ink)" : "var(--ink-3)", border: "1px solid var(--line)" }}>
+                      {m.status}
+                    </span>
+                  </td>
+                  <td data-label="Access" style={tdStyle}>
+                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                      {m.is_closed && (
+                        <span className="mono" style={{ fontSize: 10, padding: "2px 6px", borderRadius: 999, background: "oklch(0.93 0.06 25)", color: "oklch(0.45 0.1 25)", border: "1px solid oklch(0.85 0.06 25)" }}>CLOSED</span>
+                      )}
+                      {m.deadline && !m.is_closed && (
+                        <span className="mono" style={{ fontSize: 10, padding: "2px 6px", borderRadius: 999, background: "oklch(0.93 0.04 85)", color: "oklch(0.45 0.1 85)", border: "1px solid oklch(0.88 0.06 85)" }}>
+                          Due {new Date(m.deadline).toLocaleDateString()}
+                        </span>
+                      )}
+                      {m.max_attempts && (
+                        <span className="mono" style={{ fontSize: 10, padding: "2px 6px", borderRadius: 999, background: "var(--bg-2)", color: "var(--ink-3)", border: "1px solid var(--line)" }}>
+                          Max {m.max_attempts}
+                        </span>
+                      )}
+                      {!m.is_closed && !m.deadline && !m.max_attempts && (
+                        <span style={{ color: "var(--ink-3)", fontSize: 12 }}>Open</span>
+                      )}
+                    </div>
+                  </td>
+                  <td style={{ ...tdStyle, textAlign: "right" }}>
+                    <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                      {m.status !== "published" && (
+                        <button className="btn ghost sm" onClick={() => handlePublish(m.id)}>Publish</button>
+                      )}
+                      <button className="icon-btn" onClick={() => openEdit(m)}><EditIcon size={14} /></button>
+                      <button
+                        className="icon-btn"
+                        style={{ color: confirmDeleteId === m.id ? "oklch(0.5 0.15 25)" : undefined }}
+                        onClick={() => setConfirmDeleteId(confirmDeleteId === m.id ? null : m.id)}
+                      >
+                        <TrashIcon size={14} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+                {confirmDeleteId === m.id && (
+                  <tr>
+                    <td colSpan={7} style={{ padding: 0, borderBottom: "1px solid var(--line-2)" }}>
+                      <div className="del-confirm">
+                        <span style={{ flex: 1, color: "oklch(0.45 0.1 25)" }}>
+                          Delete <strong>{m.title}</strong>? This cannot be undone.
+                        </span>
+                        <button className="btn ghost sm" onClick={() => setConfirmDeleteId(null)}>Cancel</button>
+                        <button
+                          style={{ padding: "5px 14px", borderRadius: "var(--r-sm)", fontSize: 12, fontWeight: 600, background: "oklch(0.5 0.15 25)", color: "white", border: "none", cursor: "pointer" }}
+                          onClick={() => { handleDelete(m.id); setConfirmDeleteId(null); }}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
             ))}
             {modules.length === 0 && !isLoading && (
               <tr><td colSpan={7} style={{ ...tdStyle, textAlign: "center", color: "var(--ink-3)" }}>No modules yet. Create one!</td></tr>
@@ -366,19 +392,32 @@ export function AdminModules() {
 
       <style>{`
         .adm-page { padding-top: 28px; }
-        .drawer-overlay { position:fixed; inset:0; background:oklch(0 0 0/0.4); z-index:100; display:flex; justify-content:flex-end; }
-        .drawer { background:var(--bg); width:min(820px,96vw); height:100%; display:flex; flex-direction:column; overflow:hidden; box-shadow:var(--shadow-lg); }
+        .drawer-overlay { position:fixed; inset:0; background:oklch(0 0 0/0.45); z-index:100; display:flex; justify-content:flex-end; backdrop-filter:blur(2px); }
+        .drawer { background:var(--bg); width:min(960px,96vw); height:100%; display:flex; flex-direction:column; overflow:hidden; box-shadow:var(--shadow-lg); }
         .drawer-head { display:flex; justify-content:space-between; align-items:center; padding:20px 24px; border-bottom:1px solid var(--line); background:var(--surface); flex-shrink:0; }
-        .drawer-body { flex:1; overflow-y:auto; padding:20px 24px; }
+        .drawer-body { flex:1; overflow-y:auto; padding:22px 28px; }
         .drawer-foot { padding:16px 24px; border-top:1px solid var(--line); display:flex; justify-content:flex-end; gap:10px; background:var(--surface); flex-shrink:0; }
-        .drawer-cols { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
-        .drawer-left { display:flex; flex-direction:column; gap:12px; }
-        .drawer-right { display:flex; flex-direction:column; gap:12px; padding-left:20px; border-left:1px solid var(--line); }
-        .q-list { display:flex; flex-direction:column; gap:4px; max-height:200px; overflow-y:auto; }
+        .drawer-cols { display:grid; grid-template-columns:340px 1fr; gap:28px; }
+        .drawer-left { display:flex; flex-direction:column; gap:14px; min-width:0; }
+        .drawer-right { display:flex; flex-direction:column; gap:12px; padding-left:28px; border-left:1px solid var(--line); min-width:0; }
+        .q-list { display:flex; flex-direction:column; gap:4px; max-height:min(440px,50vh); overflow-y:auto; }
         .q-item { display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:var(--r-sm); border:1px solid var(--line); cursor:pointer; transition:border-color 0.15s,background 0.15s; }
         .q-item:hover { border-color:var(--ink-3); }
         .q-item.active { border-color:var(--accent); background:var(--accent-soft); }
-        @media(max-width:600px) { .drawer-cols{grid-template-columns:1fr} .drawer-right{border-left:none;border-top:1px solid var(--line);padding-left:0;padding-top:20px} }
+        .del-confirm { display:flex; align-items:center; gap:12px; padding:10px 16px; background:oklch(0.97 0.02 25); font-size:13px; }
+        @media(max-width:900px) {
+          .drawer { width:min(680px,96vw); }
+          .drawer-cols { grid-template-columns:1fr; }
+          .drawer-right { border-left:none; border-top:1px solid var(--line); padding-left:0; padding-top:18px; }
+          .q-list { max-height:min(300px,38vh); }
+        }
+        @media(max-width:640px) {
+          .drawer { width:100vw; }
+          .drawer-body { padding:14px 16px; }
+          .drawer-head { padding:16px; }
+          .drawer-foot { padding:12px 16px; }
+          .q-list { max-height:min(220px,32vh); }
+        }
       `}</style>
     </div>
   );
