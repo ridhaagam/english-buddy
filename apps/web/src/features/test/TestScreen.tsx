@@ -273,6 +273,7 @@ const CameraCapture = forwardRef<{ stopAndUpload: (sessionId: string) => Promise
     () => (localStorage.getItem("cam_consent") as any) || "pending"
   );
   const [blockReason, setBlockReason] = useState<"browser" | "os" | "">("");
+  const [retryCount, setRetryCount] = useState(0);
 
   // Expose stopAndUpload to parent via ref
   useImperativeHandle(ref, () => ({
@@ -321,7 +322,7 @@ const CameraCapture = forwardRef<{ stopAndUpload: (sessionId: string) => Promise
 
     let faceTimer: ReturnType<typeof setInterval>;
 
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 } }, audio: true })
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 } } })
       .then((stream) => {
         streamRef.current = stream;
         setStatus("active");
@@ -373,7 +374,7 @@ const CameraCapture = forwardRef<{ stopAndUpload: (sessionId: string) => Promise
       clearInterval(faceTimer);
       streamRef.current?.getTracks().forEach((t) => t.stop());
     };
-  }, [consent]);
+  }, [consent, retryCount]);
 
   // ── Consent pending ──────────────────────────────────────────────────────
   if (consent === "pending") {
@@ -475,8 +476,14 @@ const CameraCapture = forwardRef<{ stopAndUpload: (sessionId: string) => Promise
           <span className="eyebrow">Camera · proctoring</span>
           <CamBadge label="NO CAMERA" color="neutral" />
         </div>
-        <div className="cam-empty" style={{ padding: "20px 16px" }}>
-          <p style={{ margin: 0, color: "var(--ink-3)", fontSize: 13, textAlign: "center" }}>No camera device found.</p>
+        <div className="cam-empty" style={{ padding: "20px 16px", gap: 10 }}>
+          <p style={{ margin: 0, color: "var(--ink-3)", fontSize: 13, textAlign: "center", lineHeight: 1.5 }}>
+            No camera found. Check that your camera is connected and that the browser has camera permission.
+          </p>
+          <button className="btn ghost" style={{ fontSize: 12 }} onClick={() => {
+            setStatus("loading");
+            setRetryCount((c) => c + 1);
+          }}>Retry</button>
         </div>
         <CamStyle />
       </div>

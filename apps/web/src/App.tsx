@@ -46,6 +46,10 @@ export function App() {
   }
 
   function startTest(moduleId?: string) {
+    if (!moduleId) {
+      setRoute("library");
+      return;
+    }
     setTestModuleId(moduleId);
     setRoute("test");
   }
