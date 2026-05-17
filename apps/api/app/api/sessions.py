@@ -131,8 +131,6 @@ async def my_sessions(
             revealed = now >= m.reveal_at
         elif m.show_answers_after_deadline and m.deadline:
             revealed = now >= m.deadline
-        elif m.show_answers_after_deadline:
-            revealed = True
         else:
             revealed = False
         out.append({
@@ -187,11 +185,10 @@ async def get_my_session(
     mod_r = await db.execute(select(Module).where(Module.id == session.module_id))
     module = mod_r.scalar_one_or_none()
 
-    # Determine reveal state. Default is HIDDEN.
+    # Answers are hidden by default; only revealed when a past trigger exists.
     # Revealed when:
-    #   a) reveal_at is set and has already passed (time-gated reveal)
+    #   a) reveal_at is set and has already passed
     #   b) show_answers_after_deadline=True and deadline is set and has passed
-    #   c) show_answers_after_deadline=True and NO deadline/reveal_at (admin chose "reveal immediately")
     answers_revealed = False
     effective_reveal_at = None
     if module:
@@ -201,9 +198,6 @@ async def get_my_session(
         elif module.show_answers_after_deadline and module.deadline:
             effective_reveal_at = module.deadline
             answers_revealed = datetime.now(timezone.utc) >= module.deadline
-        elif module.show_answers_after_deadline and not module.deadline:
-            # No time gate — admin chose immediate reveal
-            answers_revealed = True
 
     ans_r = await db.execute(
         select(SessionAnswer).where(SessionAnswer.session_id == session_id)
@@ -369,16 +363,12 @@ async def finish_session(
 
     mod_r = await db.execute(select(Module).where(Module.id == session.module_id))
     module = mod_r.scalar_one_or_none()
-    answers_revealed = True
+    answers_revealed = False
     if module:
         if module.reveal_at:
             answers_revealed = datetime.now(timezone.utc) >= module.reveal_at
         elif module.show_answers_after_deadline and module.deadline:
             answers_revealed = datetime.now(timezone.utc) >= module.deadline
-        elif module.show_answers_after_deadline:
-            answers_revealed = True
-        else:
-            answers_revealed = False
 
     return {"score_pct": score_pct, "correct_count": correct_count, "total": total, "xp_earned": xp, "answers_revealed": answers_revealed}
 
