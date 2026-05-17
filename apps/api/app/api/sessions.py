@@ -3,7 +3,7 @@ from datetime import date, datetime, timezone
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy import and_, func, select
@@ -379,6 +379,7 @@ async def upload_recording_chunk(
     user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
     chunk: UploadFile = File(...),
+    chunk_index: int = Form(0),
 ):
     session = await _get_owned_session(db, session_id, user.id)
     if not session:
@@ -390,7 +391,13 @@ async def upload_recording_chunk(
 
     key = f"recordings/{session_id}.webm"
     try:
-        append_object(key, data, "video/webm")
+        # chunk_index 0 always overwrites — each MediaRecorder run produces a new
+        # EBML init segment, so we must start fresh rather than appending to a
+        # file that already has headers from a previous recorder instance.
+        if chunk_index == 0:
+            put_object(key, data, "video/webm")
+        else:
+            append_object(key, data, "video/webm")
     except Exception:
         logger.exception("Storage write failed for session %s", session_id)
         raise HTTPException(500, "Failed to save recording")

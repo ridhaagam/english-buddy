@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Topbar } from "./components/ui";
 import { LoginScreen } from "./features/auth/LoginScreen";
 import { ProfileScreen } from "./features/profile/ProfileScreen";
@@ -23,6 +24,7 @@ import { api } from "./lib/api";
 type AppRoute = "profile" | "library" | "practice" | "test" | "results" | "admin" | "profile-edit" | "session-detail";
 
 export function App() {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [route, setRoute] = useState<AppRoute>("profile");
@@ -61,6 +63,7 @@ export function App() {
   function handleDone(res: any) {
     setResult(res);
     setRoute("results");
+    queryClient.invalidateQueries({ queryKey: ["my-sessions"] });
   }
 
   function handleRetry() {

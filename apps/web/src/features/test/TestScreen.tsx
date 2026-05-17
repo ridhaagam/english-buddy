@@ -545,7 +545,8 @@ const CameraCapture = forwardRef<
 >(function CameraCapture({ sessionId: sessionIdProp, currentQuestionId, onFaceAnomaly }, ref) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
+  const chunksRef = useRef<{ blob: Blob; index: number }[]>([]);
+  const chunkCounterRef = useRef(0);
   const sessionIdRef = useRef<string | null>(null);
   const uploadQueueRef = useRef<Promise<void>>(Promise.resolve());
   const streamRef = useRef<MediaStream | null>(null);
@@ -559,9 +560,9 @@ const CameraCapture = forwardRef<
     sessionIdRef.current = sessionIdProp;
     const pending = [...chunksRef.current];
     chunksRef.current = [];
-    for (const chunk of pending) {
-      const c = chunk;
-      uploadQueueRef.current = uploadQueueRef.current.then(() => uploadChunk(c, sessionIdProp) as Promise<void>);
+    for (const { blob, index } of pending) {
+      const b = blob; const i = index;
+      uploadQueueRef.current = uploadQueueRef.current.then(() => uploadChunk(b, sessionIdProp, i) as Promise<void>);
     }
   }, [sessionIdProp]);
 
@@ -574,9 +575,10 @@ const CameraCapture = forwardRef<
     }
   }, []);
 
-  const uploadChunk = (blob: Blob, sid: string, keepalive = false) => {
+  const uploadChunk = (blob: Blob, sid: string, index: number, keepalive = false) => {
     const fd = new FormData();
     fd.append("chunk", blob, "recording.webm");
+    fd.append("chunk_index", String(index));
     return fetch(`/api/v1/sessions/${sid}/recording-chunk`, {
       method: "POST",
       headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` },
@@ -597,8 +599,9 @@ const CameraCapture = forwardRef<
       const original = recorder.ondataavailable;
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) {
+          const idx = chunkCounterRef.current++;
           uploadQueueRef.current = uploadQueueRef.current.then(
-            () => uploadChunk(e.data, sid, true) as Promise<void>
+            () => uploadChunk(e.data, sid, idx, true) as Promise<void>
           );
         }
         recorder.ondataavailable = original;
@@ -625,9 +628,9 @@ const CameraCapture = forwardRef<
     setSessionId: (id: string) => {
       sessionIdRef.current = id;
       // Flush any chunks buffered before sessionId was known
-      for (const chunk of chunksRef.current) {
-        const c = chunk;
-        uploadQueueRef.current = uploadQueueRef.current.then(() => uploadChunk(c, id) as Promise<void>);
+      for (const { blob, index } of chunksRef.current) {
+        const b = blob; const i = index;
+        uploadQueueRef.current = uploadQueueRef.current.then(() => uploadChunk(b, id, i) as Promise<void>);
       }
       chunksRef.current = [];
     },
@@ -640,9 +643,9 @@ const CameraCapture = forwardRef<
       // Flush any chunks buffered before sessionId was known
       const pending = [...chunksRef.current];
       chunksRef.current = [];
-      for (const chunk of pending) {
-        const c = chunk;
-        uploadQueueRef.current = uploadQueueRef.current.then(() => uploadChunk(c, sessionId) as Promise<void>);
+      for (const { blob, index } of pending) {
+        const b = blob; const i = index;
+        uploadQueueRef.current = uploadQueueRef.current.then(() => uploadChunk(b, sessionId, i) as Promise<void>);
       }
 
       const recorder = recorderRef.current;
@@ -685,13 +688,15 @@ const CameraCapture = forwardRef<
           ? "video/webm;codecs=vp9" : "video/webm";
         const recorder = new MediaRecorder(stream, { mimeType });
         recorderRef.current = recorder;
+        chunkCounterRef.current = 0;
         recorder.ondataavailable = (e) => {
           if (e.data.size <= 0) return;
+          const index = chunkCounterRef.current++;
           if (sessionIdRef.current) {
             const sid = sessionIdRef.current;
-            uploadQueueRef.current = uploadQueueRef.current.then(() => uploadChunk(e.data, sid) as Promise<void>);
+            uploadQueueRef.current = uploadQueueRef.current.then(() => uploadChunk(e.data, sid, index) as Promise<void>);
           } else {
-            chunksRef.current.push(e.data);
+            chunksRef.current.push({ blob: e.data, index });
           }
         };
         recorder.start(5000);
