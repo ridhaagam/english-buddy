@@ -51,14 +51,14 @@ class ModuleOut(BaseModel):
     is_closed: bool = False
     max_attempts: int | None = None
     reveal_at: str | None = None
-    show_answers_after_deadline: bool = True
+    show_answers_after_deadline: bool = False
 
 
 class ModuleSettingsBody(BaseModel):
     deadline: str | None = None
     is_closed: bool = False
     max_attempts: int | None = None
-    show_answers_after_deadline: bool = True
+    show_answers_after_deadline: bool = False
     reveal_at: str | None = None
 
 

@@ -56,7 +56,7 @@ class Module(Base):
     deadline: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     is_closed: Mapped[bool] = mapped_column(Boolean, default=False)
     max_attempts: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    show_answers_after_deadline: Mapped[bool] = mapped_column(Boolean, default=True)
+    show_answers_after_deadline: Mapped[bool] = mapped_column(Boolean, default=False)
     reveal_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
