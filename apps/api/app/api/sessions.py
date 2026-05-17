@@ -1,6 +1,6 @@
 import logging
 from datetime import date, datetime, timezone
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, File, HTTPException, UploadFile
@@ -64,8 +64,7 @@ async def create_session(
         raise HTTPException(403, "Module is closed")
 
     if m.deadline:
-        from datetime import timezone as _tz
-        if datetime.now(_tz.utc) > m.deadline:
+        if datetime.now(timezone.utc) > m.deadline:
             raise HTTPException(403, "Module deadline has passed")
 
     if m.max_attempts:
@@ -95,7 +94,6 @@ async def my_sessions(
     db: Annotated[AsyncSession, Depends(get_db)],
     dedupe: bool = False,
 ):
-    from sqlalchemy import text
     if dedupe:
         # Return only the most-recent session per module using a subquery
         sub = (
@@ -317,9 +315,9 @@ async def finish_session(
     )
     answers = ans_r.scalars().all()
     total_r = await db.execute(
-        select(Question).where(Question.module_id == session.module_id)
+        select(func.count()).where(Question.module_id == session.module_id)
     )
-    total_questions = len(total_r.scalars().all())
+    total_questions = total_r.scalar() or 0
 
     correct_count = sum(1 for a in answers if a.is_correct)
     total = total_questions or len(answers)
@@ -338,7 +336,7 @@ async def finish_session(
         session.tab_switch_count = body.tab_switch_count
         session.face_anomaly_count = body.face_anomaly_count
 
-    await db.refresh(user)  # re-read latest xp_total before adding (avoids stale concurrent updates)
+    await db.refresh(user)  # avoid stale xp_total on concurrent sessions
     user.xp_total += xp
 
     today = date.today()
@@ -426,54 +424,61 @@ async def get_library(
     result = await db.execute(q)
     modules = result.scalars().all()
 
+    if not modules:
+        return []
+
+    module_ids = [m.id for m in modules]
+
+    qc_r = await db.execute(
+        select(Question.module_id, func.count().label("cnt"))
+        .where(Question.module_id.in_(module_ids))
+        .group_by(Question.module_id)
+    )
+    question_counts = {row.module_id: row.cnt for row in qc_r}
+
+    sess_r = await db.execute(
+        select(Session.module_id, func.count().label("attempts_total"))
+        .where(and_(Session.module_id.in_(module_ids), Session.finished_at.isnot(None)))
+        .group_by(Session.module_id)
+    )
+    global_stats = {row.module_id: row for row in sess_r}
+
+    user_r = await db.execute(
+        select(
+            Session.module_id,
+            func.max(Session.score_pct).label("high_score"),
+            func.count().label("my_attempts"),
+            func.max(Session.finished_at).label("last_taken"),
+        )
+        .where(and_(
+            Session.module_id.in_(module_ids),
+            Session.user_id == user.id,
+            Session.finished_at.isnot(None),
+        ))
+        .group_by(Session.module_id)
+    )
+    user_stats = {row.module_id: row for row in user_r}
+
     out = []
     for m in modules:
-        qc = await db.execute(select(func.count()).where(Question.module_id == m.id))
-        questions_count = qc.scalar() or 0
-
-        all_sessions = await db.execute(
-            select(func.count(), func.avg(Session.score_pct))
-            .where(and_(Session.module_id == m.id, Session.finished_at.isnot(None)))
-        )
-        row = all_sessions.one()
-        attempts_total = row[0] or 0
-
-        user_hs = await db.execute(
-            select(func.max(Session.score_pct))
-            .where(and_(Session.module_id == m.id, Session.user_id == user.id, Session.finished_at.isnot(None)))
-        )
-        high_score = user_hs.scalar()
-
-        user_attempts = await db.execute(
-            select(func.count())
-            .where(and_(Session.module_id == m.id, Session.user_id == user.id, Session.finished_at.isnot(None)))
-        )
-        my_attempts = user_attempts.scalar() or 0
-
-        lt_r = await db.execute(
-            select(Session.finished_at)
-            .where(and_(Session.module_id == m.id, Session.user_id == user.id, Session.finished_at.isnot(None)))
-            .order_by(Session.finished_at.desc())
-            .limit(1)
-        )
-        last_taken = lt_r.scalar()
-
+        g = global_stats.get(m.id)
+        u = user_stats.get(m.id)
         out.append({
             "id": str(m.id),
             "title": m.title,
             "topic": m.topic.value,
             "cefr_level": m.cefr_level.value,
-            "questions_count": questions_count,
-            "attempts_total": attempts_total,
-            "my_attempts": my_attempts,
-            "high_score": high_score,
-            "last_taken": last_taken.isoformat() if last_taken else None,
+            "questions_count": question_counts.get(m.id, 0),
+            "attempts_total": g.attempts_total if g else 0,
+            "my_attempts": u.my_attempts if u else 0,
+            "high_score": u.high_score if u else None,
+            "last_taken": u.last_taken.isoformat() if u and u.last_taken else None,
         })
     return out
 
 
 class SessionEventBody(BaseModel):
-    event_type: str  # "open" | "interrupt" | "close" | "resume"
+    event_type: Literal["open", "interrupt", "close", "resume"]
     event_data: dict | None = None
 
 

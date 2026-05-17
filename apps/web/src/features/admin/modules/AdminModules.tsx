@@ -1,4 +1,4 @@
-import { useState, Fragment } from "react";
+import { useState, Fragment, useRef, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PlusIcon, EditIcon, TrashIcon, XIcon, ArrowRightIcon } from "../../../components/ui";
 import { api } from "../../../lib/api";
@@ -37,6 +37,14 @@ export function AdminModules() {
   const [settings, setSettings] = useState<Settings>(blankSettings);
   const [qIdx, setQIdx] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = useCallback((msg: string, ok: boolean) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast({ msg, ok });
+    toastTimer.current = setTimeout(() => setToast(null), 3500);
+  }, []);
 
   function openNew() { setEditing(null); setForm(blank); setSettings(blankSettings); setQIdx(null); setOpen(true); }
 
@@ -59,7 +67,6 @@ export function AdminModules() {
     setOpen(true);
     setDetailLoading(true);
     try {
-      // Fetch full detail to get questions and canonical settings
       const detail = await api.admin.modules.get(m.id);
       setForm((f) => ({
         ...f,
@@ -79,7 +86,6 @@ export function AdminModules() {
           payload: q.payload ?? {},
         })),
       }));
-      // Update settings from detail (has all fields)
       setSettings({
         deadline: detail.deadline ? detail.deadline.slice(0, 16) : "",
         is_closed: detail.is_closed || false,
@@ -88,7 +94,7 @@ export function AdminModules() {
         reveal_at: detail.reveal_at ? detail.reveal_at.slice(0, 16) : "",
       });
     } catch (err: any) {
-      alert("Failed to load module details: " + (err.message || "unknown error"));
+      showToast("Failed to load module: " + (err.message || "unknown error"), false);
     } finally {
       setDetailLoading(false);
     }
@@ -128,9 +134,10 @@ export function AdminModules() {
         });
       }
       qc.invalidateQueries({ queryKey: ["admin-modules"] });
+      showToast(editing ? "Module saved" : "Module created", true);
       closeDrawer();
     } catch (err: any) {
-      alert(err.message || "Save failed");
+      showToast(err.message || "Save failed", false);
     } finally {
       setSaving(false);
     }
@@ -140,8 +147,9 @@ export function AdminModules() {
     try {
       await api.admin.modules.delete(id);
       qc.invalidateQueries({ queryKey: ["admin-modules"] });
+      showToast("Module deleted", true);
     } catch (err: any) {
-      alert(err.message || "Delete failed");
+      showToast(err.message || "Delete failed", false);
     }
   }
 
@@ -149,13 +157,19 @@ export function AdminModules() {
     try {
       await api.admin.modules.publish(id);
       qc.invalidateQueries({ queryKey: ["admin-modules"] });
+      showToast("Module published", true);
     } catch (err: any) {
-      alert(err.message || "Publish failed");
+      showToast(err.message || "Publish failed", false);
     }
   }
 
   return (
     <div className="container adm-page">
+      {toast && (
+        <div className={`mod-toast${toast.ok ? " ok" : " err"}`}>
+          {toast.ok ? "✓" : "✕"} {toast.msg}
+        </div>
+      )}
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
         <div>
           <p className="eyebrow">Admin</p>
@@ -392,6 +406,10 @@ export function AdminModules() {
 
       <style>{`
         .adm-page { padding-top: 28px; }
+        .mod-toast { position:fixed; bottom:28px; right:28px; z-index:9999; padding:12px 20px; border-radius:var(--r-md); font-size:14px; font-weight:600; font-family:var(--font-ui); box-shadow:0 4px 24px oklch(0 0 0/0.14); animation:toastIn 0.22s cubic-bezier(0.22,1,0.36,1); pointer-events:none; }
+        .mod-toast.ok { background:oklch(0.48 0.13 158); color:#fff; }
+        .mod-toast.err { background:oklch(0.5 0.15 25); color:#fff; }
+        @keyframes toastIn { from { opacity:0; transform:translateY(12px) scale(0.96); } to { opacity:1; transform:translateY(0) scale(1); } }
         .drawer-overlay { position:fixed; inset:0; background:oklch(0 0 0/0.45); z-index:100; display:flex; justify-content:flex-end; backdrop-filter:blur(2px); }
         .drawer { background:var(--bg); width:min(960px,96vw); height:100%; display:flex; flex-direction:column; overflow:hidden; box-shadow:var(--shadow-lg); }
         .drawer-head { display:flex; justify-content:space-between; align-items:center; padding:20px 24px; border-bottom:1px solid var(--line); background:var(--surface); flex-shrink:0; }
@@ -439,9 +457,9 @@ function QuestionChoiceEditor({ q, onChange }: { q: Q; onChange: (p: any) => voi
       <div className="field">
         <label>Choices</label>
         {choices.map((c: any, i: number) => (
-          <div key={c.id} style={{ display: "flex", gap: 6, marginBottom: 6, alignItems: "center" }}>
-            <input type="radio" name={`correct-${q.id ?? "new"}`} checked={correct === c.id} onChange={() => onChange({ ...q.payload, answer: c.id })} />
-            <input style={{ flex: 1 }} value={c.label} onChange={(e) => {
+          <div key={c.id} style={{ display: "flex", gap: 6, marginBottom: 6, alignItems: "center", width: "100%" }}>
+            <input type="radio" name={`correct-${q.id ?? "new"}`} style={{ flexShrink: 0, width: "auto" }} checked={correct === c.id} onChange={() => onChange({ ...q.payload, answer: c.id })} />
+            <input style={{ flex: 1, minWidth: 0 }} value={c.label} onChange={(e) => {
               const c2 = choices.map((ch: any, idx: number) => idx === i ? { ...ch, label: e.target.value } : ch);
               onChange({ ...q.payload, choices: c2 });
             }} placeholder={`Choice ${i + 1}`} />

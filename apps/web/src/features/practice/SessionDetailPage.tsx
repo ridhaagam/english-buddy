@@ -196,13 +196,22 @@ export function SessionDetailPage({ sessionId, onBack, onPracticeAgain }: Props)
               )}
 
               <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ margin: "0 0 5px", fontSize: 14, fontWeight: 500 }}>{a.question_prompt || `Question ${i + 1}`}</p>
+                <p style={{ margin: "0 0 8px", fontSize: 14, fontWeight: 500 }}>{a.question_prompt || `Question ${i + 1}`}</p>
 
-                {/* Always show what the user answered */}
-                <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap", marginBottom: 2 }}>
-                  <span style={{ fontSize: 11, color: "var(--ink-3)", flexShrink: 0 }}>Your answer:</span>
-                  <span style={{ fontSize: 13, color: "var(--ink-2)", fontStyle: "italic" }}>{userAnswer}</span>
-                </div>
+                {/* Choices breakdown */}
+                {(a.kind === "choice" || a.kind === "fill") && (a.payload?.choices ?? []).length > 0 ? (
+                  <ChoiceBreakdown
+                    choices={a.payload.choices}
+                    selection={a.selection?.choice}
+                    correctAnswer={a.payload?.answer}
+                    revealed={answersRevealed}
+                  />
+                ) : (
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap", marginBottom: 2 }}>
+                    <span style={{ fontSize: 11, color: "var(--ink-3)", flexShrink: 0 }}>Your answer:</span>
+                    <span style={{ fontSize: 13, color: "var(--ink-2)", fontStyle: "italic" }}>{userAnswer}</span>
+                  </div>
+                )}
 
                 {a.flagged && (
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, padding: "2px 8px", borderRadius: 999, marginTop: 4, background: "oklch(0.95 0.06 40)", color: "oklch(0.45 0.12 40)" }}>
@@ -227,6 +236,40 @@ export function SessionDetailPage({ sessionId, onBack, onPracticeAgain }: Props)
         .sd-header { display:flex; align-items:flex-start; gap:20px; padding:24px; margin-bottom:16px; }
         @media(max-width:520px) { .sd-header{flex-direction:column} }
       `}</style>
+    </div>
+  );
+}
+
+function ChoiceBreakdown({ choices, selection, correctAnswer, revealed }: {
+  choices: any[];
+  selection: string | undefined;
+  correctAnswer: string | undefined;
+  revealed: boolean;
+}) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 5, marginTop: 4 }}>
+      {choices.map((c: any, i: number) => {
+        const isSelected = c.id === selection;
+        const isCorrect = revealed && c.id === correctAnswer;
+        const isWrong = revealed && isSelected && !isCorrect;
+        const isSelectedNotRevealed = isSelected && !revealed;
+
+        const bg = isCorrect ? "oklch(0.93 0.06 158)" : isWrong ? "oklch(0.95 0.04 25)" : isSelectedNotRevealed ? "oklch(0.93 0.04 220)" : "var(--bg-2)";
+        const border = isCorrect ? "oklch(0.75 0.12 158)" : isWrong ? "oklch(0.82 0.07 25)" : isSelectedNotRevealed ? "oklch(0.76 0.09 220)" : "var(--line-2)";
+        const color = isCorrect ? "oklch(0.38 0.13 158)" : isWrong ? "oklch(0.45 0.1 25)" : "var(--ink-2)";
+        const letter = String.fromCharCode(65 + i);
+
+        return (
+          <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", borderRadius: "var(--r-sm)", border: `1px solid ${border}`, background: bg, fontSize: 13 }}>
+            <span className="mono" style={{ fontSize: 10, color: "var(--ink-3)", flexShrink: 0, minWidth: 14 }}>{letter}.</span>
+            <span style={{ flex: 1, color }}>{c.label}</span>
+            {isSelectedNotRevealed && <span style={{ fontSize: 10, color: "oklch(0.5 0.08 220)", flexShrink: 0 }}>◀ your answer</span>}
+            {isSelected && revealed && isCorrect && <CheckIcon size={12} />}
+            {isSelected && revealed && !isCorrect && <XIcon size={12} />}
+            {!isSelected && isCorrect && <CheckIcon size={12} />}
+          </div>
+        );
+      })}
     </div>
   );
 }

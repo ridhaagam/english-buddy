@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -81,27 +81,41 @@ async def list_all_modules(
     result = await db.execute(q)
     modules = result.scalars().all()
 
+    if not modules:
+        return []
+
+    module_ids = [m.id for m in modules]
+
+    qc_r = await db.execute(
+        select(Question.module_id, func.count().label("cnt"))
+        .where(Question.module_id.in_(module_ids))
+        .group_by(Question.module_id)
+    )
+    question_counts = {row.module_id: row.cnt for row in qc_r}
+
+    sc_r = await db.execute(
+        select(
+            Session.module_id,
+            func.count().label("attempts"),
+            func.avg(Session.score_pct).label("avg_score"),
+        )
+        .where(and_(Session.module_id.in_(module_ids), Session.finished_at.isnot(None)))
+        .group_by(Session.module_id)
+    )
+    session_stats = {row.module_id: row for row in sc_r}
+
     out = []
     for m in modules:
-        qc = await db.execute(select(func.count()).where(Question.module_id == m.id))
-        questions_count = qc.scalar() or 0
-
-        from sqlalchemy import and_
-        sc = await db.execute(
-            select(func.count(), func.avg(Session.score_pct))
-            .where(and_(Session.module_id == m.id, Session.finished_at.isnot(None)))
-        )
-        srow = sc.one()
-
+        s = session_stats.get(m.id)
         out.append(ModuleOut(
             id=str(m.id),
             title=m.title,
             topic=m.topic.value,
             cefr_level=m.cefr_level.value,
             status=m.status.value,
-            questions_count=questions_count,
-            attempts=srow[0] or 0,
-            avg_score=round(float(srow[1] or 0)),
+            questions_count=question_counts.get(m.id, 0),
+            attempts=s.attempts if s else 0,
+            avg_score=round(float(s.avg_score or 0)) if s else 0,
             updated_at=m.updated_at.isoformat(),
             created_by=str(m.created_by) if m.created_by else None,
             deadline=m.deadline.isoformat() if m.deadline else None,

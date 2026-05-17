@@ -103,7 +103,7 @@ export function TestScreen({ moduleId, onExit, onDone }: Props) {
   const rightCol = useMemo(() => {
     if (!q || q.kind !== "match") return [];
     const pairs = q.payload?.pairs || [];
-    return [...pairs.map((p: any) => p.right)].sort((a: string, b: string) => a.localeCompare(b));
+    return pairs.map((p: any) => p.right).sort((a: string, b: string) => a.localeCompare(b));
   }, [q?.id]);
 
   if (sessionError) return (
@@ -126,8 +126,10 @@ export function TestScreen({ moduleId, onExit, onDone }: Props) {
   const last = idx === questions.length - 1;
   const progress = (idx + 1) / questions.length;
 
+  const choices = q.payload?.choices || [];
+  const pairs = q.payload?.pairs || [];
   const matchedRights = new Set(Object.values(matchPairs));
-  const allMatched = q.kind === "match" && (q.payload?.pairs || []).every((p: any) => matchPairs[p.left]);
+  const allMatched = q.kind === "match" && pairs.every((p: any) => matchPairs[p.left]);
   // fill with choices: selected word; fill without choices: typed input; else: selected option
   const canSubmit =
     (q.kind === "match" && allMatched) ||
@@ -235,9 +237,6 @@ export function TestScreen({ moduleId, onExit, onDone }: Props) {
       .catch(() => {});
     pendingRef.current.push(p);
   }
-
-  const choices = q.payload?.choices || [];
-  const pairs = q.payload?.pairs || [];
 
   return (
     <div className="test-shell">

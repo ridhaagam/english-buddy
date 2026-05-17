@@ -7,23 +7,15 @@ from pydantic import BaseModel
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+import random
+
 from app.core.database import get_db
 from app.core.deps import CurrentUser
 from app.models.module import Module, ModuleStatus, TopicType
+from app.models.question import Question
 from app.models.session import Session
 
 router = APIRouter(tags=["modules"])
-
-
-class QuestionOut(BaseModel):
-    id: str
-    position: int
-    kind: str
-    prompt: str
-    context: str | None
-    sentence: str | None
-    payload: dict
-    explain: str | None
 
 
 class ModuleOut(BaseModel):
@@ -62,49 +54,59 @@ async def list_modules(
     result = await db.execute(q)
     modules = result.scalars().all()
 
-    from app.models.question import Question
+    if not modules:
+        return []
+
+    module_ids = [m.id for m in modules]
+
+    qc_r = await db.execute(
+        select(Question.module_id, func.count().label("cnt"))
+        .where(Question.module_id.in_(module_ids))
+        .group_by(Question.module_id)
+    )
+    question_counts = {row.module_id: row.cnt for row in qc_r}
+
+    sess_r = await db.execute(
+        select(
+            Session.module_id,
+            func.count().label("attempts"),
+            func.avg(Session.score_pct).label("avg_score"),
+        )
+        .where(and_(Session.module_id.in_(module_ids), Session.finished_at.isnot(None)))
+        .group_by(Session.module_id)
+    )
+    global_stats = {row.module_id: row for row in sess_r}
+
+    user_r = await db.execute(
+        select(
+            Session.module_id,
+            func.max(Session.score_pct).label("high_score"),
+            func.max(Session.finished_at).label("last_taken"),
+        )
+        .where(and_(
+            Session.module_id.in_(module_ids),
+            Session.user_id == user.id,
+            Session.finished_at.isnot(None),
+        ))
+        .group_by(Session.module_id)
+    )
+    user_stats = {row.module_id: row for row in user_r}
 
     out = []
     for m in modules:
-        q_count = await db.execute(
-            select(func.count()).where(Question.module_id == m.id)
-        )
-        questions_count = q_count.scalar() or 0
-
-        sess_r = await db.execute(
-            select(func.count(), func.avg(Session.score_pct))
-            .where(and_(Session.module_id == m.id, Session.finished_at.isnot(None)))
-        )
-        sess_row = sess_r.one()
-        attempts = sess_row[0] or 0
-        avg_score = round(float(sess_row[1] or 0))
-
-        hs_r = await db.execute(
-            select(func.max(Session.score_pct))
-            .where(and_(Session.module_id == m.id, Session.user_id == user.id, Session.finished_at.isnot(None)))
-        )
-        high_score = hs_r.scalar()
-
-        lt_r = await db.execute(
-            select(Session.finished_at)
-            .where(and_(Session.module_id == m.id, Session.user_id == user.id, Session.finished_at.isnot(None)))
-            .order_by(Session.finished_at.desc())
-            .limit(1)
-        )
-        last_taken_dt = lt_r.scalar()
-        last_taken = last_taken_dt.isoformat() if last_taken_dt else None
-
+        g = global_stats.get(m.id)
+        u = user_stats.get(m.id)
         out.append(ModuleOut(
             id=str(m.id),
             title=m.title,
             topic=m.topic.value,
             cefr_level=m.cefr_level.value,
             status=m.status.value,
-            questions_count=questions_count,
-            attempts=attempts,
-            avg_score=avg_score,
-            high_score=high_score,
-            last_taken=last_taken,
+            questions_count=question_counts.get(m.id, 0),
+            attempts=g.attempts if g else 0,
+            avg_score=round(float(g.avg_score or 0)) if g else 0,
+            high_score=u.high_score if u else None,
+            last_taken=u.last_taken.isoformat() if u and u.last_taken else None,
             created_at=m.created_at.isoformat(),
             updated_at=m.updated_at.isoformat(),
         ))
@@ -123,8 +125,6 @@ async def get_module(
     if not m or m.status != ModuleStatus.published:
         raise HTTPException(404, "Module not found")
 
-    from app.models.question import Question
-    import random
     q_r = await db.execute(
         select(Question).where(Question.module_id == module_id).order_by(Question.position)
     )
@@ -167,8 +167,7 @@ async def stream_module_audio(
     user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    from fastapi.responses import FileResponse
-    from app.services.storage import get_file_path, object_exists
+    from app.services.storage import get_file_path
 
     result = await db.execute(select(Module).where(Module.id == module_id))
     m = result.scalar_one_or_none()
@@ -176,7 +175,5 @@ async def stream_module_audio(
         raise HTTPException(404, "Module not found")
     if not m.audio_blob:
         raise HTTPException(404, "No audio for this module")
-    if not object_exists(m.audio_blob):
-        raise HTTPException(404, "Audio file not found")
     path = get_file_path(m.audio_blob)
     return FileResponse(str(path), media_type="audio/mpeg")

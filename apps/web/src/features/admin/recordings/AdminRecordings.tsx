@@ -18,7 +18,7 @@ export function AdminResults() {
   const [videoShown,  setVideoShown]  = useState(false);
   const [answerEdits, setAnswerEdits] = useState<Record<string, AnswerEdit>>({});
   const [dirtyQids,   setDirtyQids]   = useState<Set<string>>(new Set());
-  const [savedQids,   setSavedQids]   = useState<Set<string>>(new Set());
+  const [hasSaved,    setHasSaved]    = useState(false);
   const [savingAll,   setSavingAll]   = useState(false);
   const [warnDiscard, setWarnDiscard] = useState(false);
 
@@ -28,7 +28,7 @@ export function AdminResults() {
     setVideoShown(false);
     setAnswerEdits({});
     setDirtyQids(new Set());
-    setSavedQids(new Set());
+    setHasSaved(false);
     setWarnDiscard(false);
 
     const [detail, urlResult] = await Promise.allSettled([
@@ -52,7 +52,6 @@ export function AdminResults() {
   function editAnswer(qid: string, patch: Partial<AnswerEdit>) {
     setAnswerEdits((prev) => ({ ...prev, [qid]: { ...(prev[qid] ?? { flagged: false, admin_comment: "" }), ...patch } }));
     setDirtyQids((prev) => new Set([...prev, qid]));
-    setSavedQids((prev) => { const s = new Set(prev); s.delete(qid); return s; });
     setWarnDiscard(false);
   }
 
@@ -64,7 +63,7 @@ export function AdminResults() {
       await Promise.all(qids.map((qid) =>
         api.admin.recordings.flagAnswer(viewing.id, qid, answerEdits[qid] ?? { flagged: false, admin_comment: "" })
       ));
-      setSavedQids(new Set([...savedQids, ...qids]));
+      setHasSaved(true);
       setDirtyQids(new Set());
       qc.invalidateQueries({ queryKey: ["admin-recordings"] });
     } finally {
@@ -338,7 +337,7 @@ export function AdminResults() {
                     const qid  = a.question_id as string | undefined;
                     const edit = qid ? (answerEdits[qid] ?? { flagged: a.flagged ?? false, admin_comment: a.admin_comment ?? "" }) : null;
                     const isDirty = qid ? dirtyQids.has(qid) : false;
-                    const isSaved = qid ? savedQids.has(qid) : false;
+                    const isSaved = hasSaved && !isDirty;
 
                     return (
                       <div key={i} className={`res-ans-card${edit?.flagged ? " flagged" : ""}`}>
@@ -357,7 +356,14 @@ export function AdminResults() {
                               )}
                             </div>
                             <p className="res-ans-prompt">{a.question_prompt ?? `Question ${i + 1}`}</p>
-                            {a.selection && (
+                            {(a.question_kind === "choice" || a.question_kind === "fill") && (a.payload?.choices ?? []).length > 0 ? (
+                              <AdminChoiceBreakdown
+                                choices={a.payload.choices}
+                                selection={a.selection?.choice}
+                                correctAnswer={a.payload?.answer}
+                                isCorrect={a.is_correct}
+                              />
+                            ) : a.selection && (
                               <p className={`res-ans-sel${a.is_correct ? " ok" : " err"}`}>
                                 → {typeof a.selection === "object" ? JSON.stringify(a.selection) : a.selection}
                               </p>
@@ -398,7 +404,7 @@ export function AdminResults() {
               <span className="res-foot-status">
                 {dirtyCount > 0
                   ? <><strong>{dirtyCount}</strong> unsaved</>
-                  : savedQids.size > 0
+                  : hasSaved
                   ? <span style={{ color: "oklch(0.5 0.13 158)" }}>All saved ✓</span>
                   : <span style={{ opacity: 0.5 }}>No changes</span>
                 }
@@ -587,6 +593,37 @@ function EventBadge({ label, hue }: { label: string; hue: number }) {
     }}>
       {label}
     </span>
+  );
+}
+
+function AdminChoiceBreakdown({ choices, selection, correctAnswer, isCorrect }: {
+  choices: any[];
+  selection: string | undefined;
+  correctAnswer: string | undefined;
+  isCorrect: boolean;
+}) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 6 }}>
+      {choices.map((c: any, i: number) => {
+        const isSelected = c.id === selection;
+        const isRight = c.id === correctAnswer;
+        const isWrong = isSelected && !isRight;
+
+        const bg = isRight ? "oklch(0.92 0.06 158)" : isWrong ? "oklch(0.94 0.05 25)" : "var(--bg)";
+        const border = isRight ? "oklch(0.78 0.1 158)" : isWrong ? "oklch(0.82 0.07 25)" : "var(--line-2)";
+        const color = isRight ? "oklch(0.38 0.13 158)" : isWrong ? "oklch(0.45 0.1 25)" : "var(--ink-2)";
+        const letter = String.fromCharCode(65 + i);
+
+        return (
+          <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 7, padding: "5px 9px", borderRadius: 6, border: `1px solid ${border}`, background: bg, fontSize: 12 }}>
+            <span style={{ fontSize: 9, color: "var(--ink-3)", flexShrink: 0, minWidth: 12, fontFamily: "var(--font-mono)" }}>{letter}.</span>
+            <span style={{ flex: 1, color }}>{c.label}</span>
+            {isSelected && isRight  && <CheckIcon size={11} />}
+            {isSelected && !isRight && <XIcon size={11} />}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
