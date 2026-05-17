@@ -1,0 +1,89 @@
+import { useState } from "react";
+import { Logo, ShieldIcon, BarChartIcon, BookOpenIcon, MicIcon, VideoIcon, UsersIcon, HomeIcon, ArrowRightIcon, PlusIcon, ImportIcon, FlagIcon } from "../../components/ui";
+
+type AdminRoute = "dashboard" | "modules" | "import-doc" | "import-audio" | "recordings" | "reports" | "users" | "audit-log";
+
+type Props = {
+  user: any;
+  children: (route: AdminRoute, navigate: (r: AdminRoute) => void) => React.ReactNode;
+  onExitAdmin: () => void;
+  isOwner?: boolean;
+};
+
+const NAV_ITEMS: { id: AdminRoute; label: string; icon: React.ReactNode; ownerOnly?: boolean }[] = [
+  { id: "dashboard", label: "Dashboard", icon: <HomeIcon size={16} /> },
+  { id: "modules", label: "Modules", icon: <BookOpenIcon size={16} /> },
+  { id: "import-doc", label: "Import doc", icon: <ImportIcon size={16} /> },
+  { id: "import-audio", label: "Listening", icon: <MicIcon size={16} /> },
+  { id: "recordings", label: "Recordings", icon: <VideoIcon size={16} /> },
+  { id: "reports", label: "Reports", icon: <BarChartIcon size={16} /> },
+  { id: "users", label: "Users", icon: <UsersIcon size={16} /> },
+  { id: "audit-log", label: "Audit log", icon: <FlagIcon size={16} />, ownerOnly: true },
+];
+
+export function AdminShell({ user, children, onExitAdmin, isOwner }: Props) {
+  const [route, setRoute] = useState<AdminRoute>("dashboard");
+  const [collapsed, setCollapsed] = useState(false);
+
+  return (
+    <div className="adm-shell">
+      <aside className={`adm-sidebar${collapsed ? " collapsed" : ""}`}>
+        <div className="adm-sb-top">
+          <div className="adm-logo">
+            {!collapsed && <Logo />}
+            <button className="icon-btn adm-toggle" onClick={() => setCollapsed((c) => !c)} aria-label="Toggle sidebar" style={{ transform: collapsed ? "rotate(0deg)" : "rotate(180deg)", transition: "transform 0.2s" }}>
+              <ArrowRightIcon size={14} />
+            </button>
+          </div>
+          {!collapsed && (
+            <div className="adm-badge">
+              <ShieldIcon size={12} />
+              <span className="mono">Admin panel</span>
+            </div>
+          )}
+        </div>
+
+        <nav className="adm-nav">
+          {NAV_ITEMS.filter((item) => !item.ownerOnly || isOwner).map((item) => (
+            <button key={item.id}
+              className={`adm-nav-item${route === item.id ? " active" : ""}`}
+              onClick={() => setRoute(item.id)}
+              title={collapsed ? item.label : undefined}>
+              <span className="adm-nav-icon">{item.icon}</span>
+              {!collapsed && <span>{item.label}</span>}
+            </button>
+          ))}
+        </nav>
+
+        <div className="adm-sb-foot">
+          <button className="adm-nav-item" onClick={onExitAdmin} title={collapsed ? "Back to app" : undefined}>
+            <span className="adm-nav-icon"><HomeIcon size={16} /></span>
+            {!collapsed && <span>Back to app</span>}
+          </button>
+        </div>
+      </aside>
+
+      <div className="adm-content">
+        {children(route, setRoute)}
+      </div>
+
+      <style>{`
+        .adm-shell { display:flex; min-height:100vh; background:var(--bg); }
+        .adm-sidebar { width:220px; background:oklch(0.14 0.01 250); display:flex; flex-direction:column; flex-shrink:0; transition:width 0.22s cubic-bezier(0.22,1,0.36,1); overflow:hidden; }
+        .adm-sidebar.collapsed { width:56px; }
+        .adm-sb-top { padding:18px 14px 10px; border-bottom:1px solid oklch(0.25 0.01 250); }
+        .adm-logo { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+        .adm-badge { display:flex; align-items:center; gap:6px; padding:4px 8px; background:oklch(0.55 0.12 158/0.15); border-radius:6px; color:oklch(0.7 0.12 158); font-size:10px; letter-spacing:0.08em; }
+        .adm-toggle { color:oklch(0.6 0.01 250); background:none; border:none; }
+        .adm-toggle:hover { color:white; }
+        .adm-nav { flex:1; padding:10px 8px; display:flex; flex-direction:column; gap:2px; overflow-y:auto; }
+        .adm-nav-item { display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:8px; border:none; background:none; color:oklch(0.6 0.02 250); cursor:pointer; font-size:13.5px; font-family:var(--font-ui); transition:background 0.15s,color 0.15s; white-space:nowrap; overflow:hidden; width:100%; text-align:left; }
+        .adm-nav-item:hover { background:oklch(0.22 0.01 250); color:oklch(0.9 0.01 250); }
+        .adm-nav-item.active { background:oklch(0.55 0.12 158/0.18); color:oklch(0.75 0.12 158); font-weight:600; }
+        .adm-nav-icon { width:18px; flex-shrink:0; display:grid; place-items:center; }
+        .adm-sb-foot { padding:10px 8px; border-top:1px solid oklch(0.22 0.01 250); }
+        .adm-content { flex:1; overflow-y:auto; min-width:0; }
+      `}</style>
+    </div>
+  );
+}

@@ -1,0 +1,66 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+.eggs/
+.pytest_cache/
+
+# Environment & secrets
+.env
+.env.local
+.env.*.local
+
+# Docker volumes (local data)
+pgdata/
+filedata/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# Model weights (large binary files — download on first run)
+*.bin
+*.gguf
+*.pt
+*.onnx
+
+# Coverage
+htmlcov/
+.coverage
+coverage.xml
+
+# Alembic migration generated pyc
+apps/api/alembic/__pycache__/
+
+# Claude Code session data
+.claude/
+
+# Root-level files not for repo
+BUILD_PROMPT.md
+index.html
+vocabulary.pdf

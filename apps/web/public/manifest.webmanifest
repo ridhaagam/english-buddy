@@ -1,0 +1,23 @@
+{
+  "name": "EnglishBuddy",
+  "short_name": "EnglishBuddy",
+  "description": "Study English every day — practice modules, streaks, and progress tracking.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#faf9f6",
+  "theme_color": "#4a9268",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "categories": ["education", "productivity"],
+  "lang": "en-US"
+}
