@@ -1,18 +1,28 @@
-# EnglishBuddy
+<p align="center">
+  <img src="assets/logo.png" alt="EnglishBuddy" width="180" />
+</p>
 
-A web-based English practice platform for adult learners. Short daily sessions — vocabulary, grammar, listening — with camera-based integrity monitoring and a local-AI import pipeline that turns PDFs and audio files into practice modules without sending anything to a cloud.
+<h1 align="center">EnglishBuddy</h1>
+
+<p align="center">
+  A web-based English practice platform for adult learners. Short daily sessions — vocabulary, grammar, listening — with camera-based integrity monitoring and a local-AI import pipeline that turns PDFs and audio files into practice modules without sending anything to a cloud.
+</p>
 
 ---
 
 ## What it does
 
 **For learners**
-- Pick a module from the library and take a 10-minute session
-- Each session is timed, scored, and recorded (with consent) for review
+- Library shows only the modules assigned to you, grouped by course
+- Pick a module and take a 10-minute session — timed, scored, and recorded (with consent)
+- Resume interrupted sessions — the app remembers exactly which questions you've answered
 - Streak tracking, XP, and a daily-goal ring keep progress visible without being noisy
 - Results show per-question breakdowns — what you got right, how long each answer took
 
 **For admins**
+- Create **courses** (named groups of modules) and enroll specific learners per course
+- Assign individual modules directly to learners when a full course isn't needed
+- Set **deadlines** and **max attempts** per module; close a module instantly with a toggle
 - Drop a PDF or Word vocabulary list — the app extracts words and auto-generates MCQ and match questions
 - Upload audio for listening modules — whisper.cpp transcribes locally, a quantized Qwen LLM drafts comprehension questions
 - Review session recordings with a per-question answer overlay, flag anything suspicious, export to CSV
@@ -57,7 +67,7 @@ cd english-buddy
 | Account | Email | Password |
 |---|---|---|
 | Owner (admin) | agam@gmail.com | agam123 |
-| Learner | gery@gmail.com | 123456 |
+| Learner | gery@gmail.com | 000000 |
 
 The app runs at **http://localhost:5173**.
 
@@ -98,11 +108,11 @@ apps/
       workers/  Celery tasks (achievements, ASR pipeline)
   web/          React frontend
     src/
-      features/ One folder per screen (auth, library, test, results, admin/*)
+      features/ One folder per screen (auth, library, test, results, profile, admin/*)
       components/ui.tsx  Shared atoms
       lib/api.ts         API client
       styles/tokens.css  Design tokens
-BUILD_PROMPT.md  Full product spec
+assets/         Static assets (logo, etc.)
 ```
 
 ---
