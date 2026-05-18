@@ -189,7 +189,7 @@ function LearnersTab() {
                 <td data-label="Email" style={{ ...tdStyle, color: "var(--ink-2)" }}>{u.email}</td>
                 <td data-label="Sessions" style={tdStyle}><span className="mono" style={{ fontSize: 12 }}>{u.total_sessions ?? 0}</span></td>
                 <td data-label="Last active" style={{ ...tdStyle, color: "var(--ink-3)", fontSize: 13 }}>
-                  {u.last_active ? new Date(u.last_active).toLocaleDateString() : "Never"}
+                  {u.last_seen_at ? new Date(u.last_seen_at).toLocaleDateString() : "Never"}
                 </td>
                 <td data-label="Avg score" style={tdStyle}>
                   {u.avg_score != null

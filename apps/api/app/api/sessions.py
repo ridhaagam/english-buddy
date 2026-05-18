@@ -379,11 +379,13 @@ async def upload_recording_chunk(
     user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
     chunk: UploadFile = File(...),
-    chunk_index: int = Form(0),
+    chunk_index: int | None = Form(None),
 ):
     session = await _get_owned_session(db, session_id, user.id)
     if not session:
         raise HTTPException(404, "Session not found")
+    if session.finished_at:
+        return  # Session already finished; silently drop stale chunks
 
     data = await chunk.read()
     if not data:
@@ -391,9 +393,10 @@ async def upload_recording_chunk(
 
     key = f"recordings/{session_id}.webm"
     try:
-        # chunk_index 0 always overwrites — each MediaRecorder run produces a new
-        # EBML init segment, so we must start fresh rather than appending to a
-        # file that already has headers from a previous recorder instance.
+        # chunk_index=None means the client did not send the field (old frontend
+        # code that lacks chunk tracking) — always append so we don't lose data.
+        # chunk_index=0 means new-recorder-start; overwrite so the fresh EBML
+        # init segment replaces any previously-appended headers from a prior run.
         if chunk_index == 0:
             put_object(key, data, "video/webm")
         else:

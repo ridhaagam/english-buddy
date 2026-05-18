@@ -36,7 +36,7 @@ export function ProfileScreen({ user, onStartTest, onNav }: Props) {
             Hello, <span className="serif-it">{user.display_name?.split(" ")[0] ?? "learner"}</span>.
           </h1>
           <p style={{ color: "var(--ink-2)", maxWidth: 560, margin: 0 }}>
-            You're on a <strong>{user.streak ?? 0}-day</strong> streak. Today's session is ready.
+            You're on a <strong>{(stats?.streak ?? user.streak ?? 0)}-day</strong> streak. Today's session is ready.
           </p>
         </div>
         <div className="hero-right">

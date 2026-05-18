@@ -674,7 +674,7 @@ const CameraCapture = forwardRef<
 
     let faceActive = true;
 
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 } } })
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 480 }, height: { ideal: 360 }, frameRate: { max: 24 } } })
       .then((stream) => {
         streamRef.current = stream;
         // If the video element is already mounted, wire it up immediately
@@ -684,9 +684,9 @@ const CameraCapture = forwardRef<
         }
         setStatus("active");
 
-        const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
-          ? "video/webm;codecs=vp9" : "video/webm";
-        const recorder = new MediaRecorder(stream, { mimeType });
+        const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp8")
+          ? "video/webm;codecs=vp8" : "video/webm";
+        const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 400_000 });
         recorderRef.current = recorder;
         chunkCounterRef.current = 0;
         recorder.ondataavailable = (e) => {
@@ -699,17 +699,14 @@ const CameraCapture = forwardRef<
             chunksRef.current.push({ blob: e.data, index });
           }
         };
-        recorder.start(5000);
+        recorder.start(3000);
 
         // Sequential async detection loop — each inference waits for the previous to complete,
         // preventing GPU saturation that causes the live video feed to freeze
         import("face-api.js").then(async (faceapi) => {
           try {
             try { await (faceapi as any).tf.setBackend("webgl"); } catch {}
-            await Promise.all([
-              faceapi.nets.tinyFaceDetector.loadFromUri("/face-api-weights"),
-              faceapi.nets.faceLandmark68Net.loadFromUri("/face-api-weights"),
-            ]);
+            await faceapi.nets.tinyFaceDetector.loadFromUri("/face-api-weights");
             setFaceDetAvail(true);
             while (faceActive) {
               await new Promise<void>((r) => setTimeout(r, 2000));
@@ -718,7 +715,7 @@ const CameraCapture = forwardRef<
               try {
                 const results = await faceapi
                   .detectAllFaces(videoRef.current, new faceapi.TinyFaceDetectorOptions({ scoreThreshold: 0.5 }))
-                  .withFaceLandmarks();
+                  .run();
                 if (!faceActive) break;
                 const count = results.length;
                 setFaceCount(count);
@@ -727,16 +724,12 @@ const CameraCapture = forwardRef<
                 let gazeGood = count === 1;
 
                 if (count === 1) {
-                  const lms = results[0].landmarks;
-                  const box = results[0].detection.box;
-                  const leftEye = lms.getLeftEye();
-                  const rightEye = lms.getRightEye();
-                  const allEye = [...leftEye, ...rightEye];
-                  const eyeCX = allEye.reduce((s, p) => s + p.x, 0) / allEye.length;
-                  const eyeCY = allEye.reduce((s, p) => s + p.y, 0) / allEye.length;
-                  const nx = (eyeCX - box.x) / box.width;
-                  const ny = (eyeCY - box.y) / box.height;
-                  if (nx < 0.2 || nx > 0.8 || ny < 0.15 || ny > 0.6) {
+                  const { x, y, width, height } = results[0].box;
+                  const vw = videoRef.current.videoWidth || 480;
+                  const vh = videoRef.current.videoHeight || 360;
+                  const cx = (x + width / 2) / vw;
+                  const cy = (y + height / 2) / vh;
+                  if (cx < 0.2 || cx > 0.8 || cy < 0.1 || cy > 0.9) {
                     anomaly = true;
                     gazeGood = false;
                   }
