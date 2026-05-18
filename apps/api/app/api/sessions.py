@@ -12,9 +12,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.deps import CurrentUser
 from app.core.security import create_access_token, decode_token
+from app.models.course import CourseModule, CourseUser, ModuleAssignment
 from app.models.module import Module, ModuleStatus, TopicType
 from app.models.question import Question
 from app.models.session import Session, SessionAnswer, SessionEvent
+from app.models.user import UserRole
 from app.services.storage import append_object, get_file_path, object_exists, put_object
 
 logger = logging.getLogger(__name__)
@@ -24,6 +26,7 @@ router = APIRouter(tags=["sessions"])
 
 class CreateSessionBody(BaseModel):
     module_id: str
+    resume_from_session_id: str | None = None
 
 
 class AnswerBody(BaseModel):
@@ -76,10 +79,46 @@ async def create_session(
         if (attempts_r.scalar() or 0) >= m.max_attempts:
             raise HTTPException(403, "Maximum attempts reached")
 
+    # Learners must have access via direct assignment or course enrollment
+    if user.role == UserRole.learner:
+        direct_r = await db.execute(
+            select(ModuleAssignment).where(
+                and_(ModuleAssignment.module_id == m.id, ModuleAssignment.user_id == user.id)
+            )
+        )
+        if not direct_r.scalar_one_or_none():
+            course_r = await db.execute(
+                select(CourseModule).where(
+                    and_(
+                        CourseModule.module_id == m.id,
+                        CourseModule.course_id.in_(
+                            select(CourseUser.course_id).where(CourseUser.user_id == user.id)
+                        ),
+                    )
+                )
+            )
+            if not course_r.scalar_one_or_none():
+                raise HTTPException(403, "You do not have access to this module")
+
     session = Session(
         user_id=user.id,
         module_id=UUID(body.module_id),
     )
+
+    # For a resume, record the link and inherit the recording blob so new chunks
+    # are appended to the same file (one continuous video across both sittings).
+    if body.resume_from_session_id:
+        prev_r = await db.execute(
+            select(Session).where(
+                and_(Session.id == UUID(body.resume_from_session_id), Session.user_id == user.id)
+            )
+        )
+        prev_session = prev_r.scalar_one_or_none()
+        if prev_session:
+            session.resume_from_session_id = prev_session.id
+            if prev_session.recording_blob:
+                session.recording_blob = prev_session.recording_blob
+
     db.add(session)
     await db.flush()
     return {"id": str(session.id), "module_id": str(session.module_id)}
@@ -150,6 +189,72 @@ async def my_sessions(
             "answers_revealed": revealed,
         })
     return out
+
+
+@router.get("/sessions/me/resumable")
+async def get_resumable_session(
+    module_id: str,
+    user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Return the most-recent finished session for module_id if the resume chain
+    hasn't covered all questions yet — allowing the frontend to offer a resume flow.
+
+    Walks resume_from_session_id links to collect ALL answered question IDs across
+    the entire attempt chain, so a completed resumed session never triggers the dialog.
+    """
+    result = await db.execute(
+        select(Session)
+        .where(and_(
+            Session.user_id == user.id,
+            Session.module_id == UUID(module_id),
+            Session.finished_at.isnot(None),
+        ))
+        .order_by(Session.finished_at.desc())
+        .limit(1)
+    )
+    latest = result.scalar_one_or_none()
+    if not latest:
+        return {"resumable": False}
+
+    total_r = await db.execute(
+        select(func.count()).where(Question.module_id == UUID(module_id))
+    )
+    total = total_r.scalar() or 0
+
+    # Walk the resume chain to collect every session in this attempt run
+    chain_ids = []
+    current = latest
+    visited: set = set()
+    while current and str(current.id) not in visited:
+        chain_ids.append(current.id)
+        visited.add(str(current.id))
+        if current.resume_from_session_id:
+            prev_r = await db.execute(
+                select(Session).where(Session.id == current.resume_from_session_id)
+            )
+            current = prev_r.scalar_one_or_none()
+        else:
+            break
+
+    # Union of all question IDs answered across the chain
+    ans_r = await db.execute(
+        select(SessionAnswer.question_id)
+        .where(SessionAnswer.session_id.in_(chain_ids))
+        .distinct()
+    )
+    all_answered_ids = [str(r[0]) for r in ans_r.all()]
+
+    if total == 0 or len(all_answered_ids) >= total:
+        return {"resumable": False}
+
+    return {
+        "resumable": True,
+        "session_id": str(latest.id),
+        "answered_question_ids": all_answered_ids,
+        "answered_count": len(all_answered_ids),
+        "total_count": total,
+    }
 
 
 @router.get("/sessions/me/{session_id}/play-url")
@@ -391,13 +496,21 @@ async def upload_recording_chunk(
     if not data:
         return
 
-    key = f"recordings/{session_id}.webm"
+    # For resumed sessions the blob key is inherited from the previous session so
+    # all chunks land in the same file (one continuous recording across sittings).
+    key = session.recording_blob or f"recordings/{session_id}.webm"
     try:
-        # chunk_index=None means the client did not send the field (old frontend
-        # code that lacks chunk tracking) — always append so we don't lose data.
-        # chunk_index=0 means new-recorder-start; overwrite so the fresh EBML
-        # init segment replaces any previously-appended headers from a prior run.
-        if chunk_index == 0:
+        if chunk_index == 0 and session.recording_blob and object_exists(session.recording_blob):
+            # Resume: the MediaRecorder emits a fresh EBML init segment as chunk 0.
+            # We must strip it and append only the first Cluster onward, otherwise
+            # the second init segment would corrupt the existing stream.
+            CLUSTER_ID = b"\x1f\x43\xb6\x75"
+            pos = data.find(CLUSTER_ID)
+            if pos >= 0:
+                append_object(key, data[pos:], "video/webm")
+            # If no Cluster found this is a pure init-only chunk — nothing to append.
+        elif chunk_index == 0:
+            # Fresh recording: overwrite so the new EBML header starts clean.
             put_object(key, data, "video/webm")
         else:
             append_object(key, data, "video/webm")
@@ -436,7 +549,27 @@ async def get_library(
     topic: str | None = None,
     level: str | None = None,
 ):
+    from app.models.course import Course
+
+    is_staff = user.role in (UserRole.admin, UserRole.owner, UserRole.editor)
+
     q = select(Module).where(Module.status == ModuleStatus.published)
+
+    # Learners only see modules they have been assigned to (directly or via course)
+    if not is_staff:
+        direct_ids = select(ModuleAssignment.module_id).where(ModuleAssignment.user_id == user.id)
+        via_course_ids = (
+            select(CourseModule.module_id)
+            .where(
+                CourseModule.course_id.in_(
+                    select(CourseUser.course_id).where(CourseUser.user_id == user.id)
+                )
+            )
+        )
+        from sqlalchemy import union
+        accessible = union(direct_ids, via_course_ids).subquery()
+        q = q.where(Module.id.in_(select(accessible.c.module_id)))
+
     if topic and topic.lower() != "all":
         try:
             q = q.where(Module.topic == TopicType(topic.lower()))
@@ -444,6 +577,7 @@ async def get_library(
             pass
     if level:
         q = q.where(Module.cefr_level == level)
+
     result = await db.execute(q)
     modules = result.scalars().all()
 
@@ -482,10 +616,24 @@ async def get_library(
     )
     user_stats = {row.module_id: row for row in user_r}
 
+    # Look up the primary course for each module (first course added, for grouping)
+    course_r = await db.execute(
+        select(CourseModule.module_id, CourseModule.course_id, Course.title)
+        .join(Course, Course.id == CourseModule.course_id)
+        .where(CourseModule.module_id.in_(module_ids))
+        .order_by(CourseModule.added_at)
+    )
+    # Keep only the first course per module
+    module_course: dict = {}
+    for mid, cid, ctitle in course_r:
+        if mid not in module_course:
+            module_course[mid] = {"course_id": str(cid), "course_title": ctitle}
+
     out = []
     for m in modules:
         g = global_stats.get(m.id)
         u = user_stats.get(m.id)
+        course_info = module_course.get(m.id, {})
         out.append({
             "id": str(m.id),
             "title": m.title,
@@ -496,6 +644,8 @@ async def get_library(
             "my_attempts": u.my_attempts if u else 0,
             "high_score": u.high_score if u else None,
             "last_taken": u.last_taken.isoformat() if u and u.last_taken else None,
+            "course_id": course_info.get("course_id"),
+            "course_title": course_info.get("course_title"),
         })
     return out
 

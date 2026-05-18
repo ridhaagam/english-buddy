@@ -129,11 +129,23 @@ export const api = {
   },
 
   sessions: {
-    create: (module_id: string) =>
+    create: (module_id: string, resumeFromSessionId?: string) =>
       request<{ id: string; module_id: string }>("/sessions", {
         method: "POST",
-        body: JSON.stringify({ module_id }),
+        body: JSON.stringify(
+          resumeFromSessionId
+            ? { module_id, resume_from_session_id: resumeFromSessionId }
+            : { module_id }
+        ),
       }),
+    resumable: (module_id: string) =>
+      request<{
+        resumable: boolean;
+        session_id?: string;
+        answered_question_ids?: string[];
+        answered_count?: number;
+        total_count?: number;
+      }>(`/sessions/me/resumable?module_id=${module_id}`),
     answer: (session_id: string, data: {
       question_id: string;
       selection: Record<string, string>;
@@ -259,6 +271,27 @@ export const api = {
         const q = params ? "?" + new URLSearchParams(Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)]))).toString() : "";
         return request<{ entries: any[] }>(`/admin/audit-log${q}`);
       },
+    },
+    courses: {
+      list: () => request<any[]>("/admin/courses"),
+      get: (id: string) => request<any>(`/admin/courses/${id}`),
+      create: (data: { title: string; description?: string }) =>
+        request<any>("/admin/courses", { method: "POST", body: JSON.stringify(data) }),
+      update: (id: string, data: { title: string; description?: string }) =>
+        request<any>(`/admin/courses/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+      delete: (id: string) => request<void>(`/admin/courses/${id}`, { method: "DELETE" }),
+      addModules: (id: string, module_ids: string[]) =>
+        request<any>(`/admin/courses/${id}/modules`, { method: "POST", body: JSON.stringify({ module_ids }) }),
+      removeModule: (id: string, module_id: string) =>
+        request<void>(`/admin/courses/${id}/modules/${module_id}`, { method: "DELETE" }),
+      enrollUsers: (id: string, user_ids: string[]) =>
+        request<any>(`/admin/courses/${id}/users`, { method: "POST", body: JSON.stringify({ user_ids }) }),
+      unenrollUser: (id: string, user_id: string) =>
+        request<void>(`/admin/courses/${id}/users/${user_id}`, { method: "DELETE" }),
+      getModuleAssignments: (module_id: string) =>
+        request<any>(`/admin/courses/module-assignments/${module_id}`),
+      setModuleAssignments: (module_id: string, user_ids: string[]) =>
+        request<any>(`/admin/courses/module-assignments/${module_id}`, { method: "PUT", body: JSON.stringify({ user_ids }) }),
     },
   },
 };

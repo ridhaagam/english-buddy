@@ -28,6 +28,7 @@ class Session(Base):
     admin_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
     tab_switch_count: Mapped[int] = mapped_column(Integer, default=0)
     face_anomaly_count: Mapped[int] = mapped_column(Integer, default=0)
+    resume_from_session_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("english_sessions.id"), nullable=True)
 
     user: Mapped["User"] = relationship("User", back_populates="sessions", lazy="noload")
     module: Mapped["Module"] = relationship("Module", back_populates="sessions", lazy="noload")

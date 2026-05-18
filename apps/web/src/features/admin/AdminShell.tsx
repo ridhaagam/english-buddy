@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Logo, ShieldIcon, BarChartIcon, BookOpenIcon, MicIcon, VideoIcon, UsersIcon, HomeIcon, ArrowRightIcon, ImportIcon, FlagIcon } from "../../components/ui";
+import { Logo, ShieldIcon, BarChartIcon, BookOpenIcon, MicIcon, VideoIcon, UsersIcon, HomeIcon, ArrowRightIcon, ImportIcon, FlagIcon, LayersIcon } from "../../components/ui";
 
-type AdminRoute = "dashboard" | "modules" | "import-doc" | "import-audio" | "results" | "reports" | "users" | "audit-log" | "face-test";
+type AdminRoute = "dashboard" | "modules" | "courses" | "import-doc" | "import-audio" | "results" | "reports" | "users" | "audit-log" | "face-test";
 
 type Props = {
   user: any;
@@ -13,6 +13,7 @@ type Props = {
 const NAV_ITEMS: { id: AdminRoute; label: string; icon: React.ReactNode; ownerOnly?: boolean }[] = [
   { id: "dashboard",    label: "Dashboard",  icon: <HomeIcon size={16} /> },
   { id: "modules",      label: "Modules",    icon: <BookOpenIcon size={16} /> },
+  { id: "courses",      label: "Courses",    icon: <LayersIcon size={16} /> },
   { id: "import-doc",   label: "Import doc", icon: <ImportIcon size={16} /> },
   { id: "import-audio", label: "Listening",  icon: <MicIcon size={16} /> },
   { id: "results",      label: "Results",    icon: <VideoIcon size={16} /> },

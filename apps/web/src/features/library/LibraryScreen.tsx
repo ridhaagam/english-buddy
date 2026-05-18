@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ProgressBar, ArrowRightIcon, ModuleGlyph } from "../../components/ui";
+import { ProgressBar, ArrowRightIcon, ModuleGlyph, LayersIcon } from "../../components/ui";
 import { api } from "../../lib/api";
 
 const TOPICS = ["All", "Vocabulary", "Grammar", "Listening", "Speaking", "Writing"];
@@ -14,13 +14,36 @@ export function LibraryScreen({ onStartTest }: Props) {
     queryFn: () => api.library.list(topic !== "All" ? { topic: topic.toLowerCase() } : undefined),
   });
 
-  const avgHigh = library.filter((x: any) => x.high_score !== null).length
-    ? Math.round(library.filter((x: any) => x.high_score !== null).reduce((a: number, b: any) => a + (b.high_score || 0), 0) / library.filter((x: any) => x.high_score !== null).length)
-    : 0;
-
   const topicColors: Record<string, string> = {
     vocabulary: "158", grammar: "65", listening: "220", speaking: "25", writing: "300",
   };
+
+  // Group modules by course; modules with no course go into "Other"
+  const groups = useMemo(() => {
+    const map = new Map<string, { id: string | null; title: string; modules: any[] }>();
+    for (const m of library as any[]) {
+      const key = m.course_id ?? "__other__";
+      if (!map.has(key)) {
+        map.set(key, { id: m.course_id ?? null, title: m.course_title ?? "Other", modules: [] });
+      }
+      map.get(key)!.modules.push(m);
+    }
+    // Sort: named courses first (alphabetically), "Other" last
+    const entries = Array.from(map.values());
+    entries.sort((a, b) => {
+      if (a.id === null) return 1;
+      if (b.id === null) return -1;
+      return a.title.localeCompare(b.title);
+    });
+    return entries;
+  }, [library]);
+
+  const isEmpty = (library as any[]).length === 0;
+  const avgHigh = (library as any[]).filter((x: any) => x.high_score !== null).length
+    ? Math.round((library as any[]).filter((x: any) => x.high_score !== null).reduce((a: number, b: any) => a + (b.high_score || 0), 0) / (library as any[]).filter((x: any) => x.high_score !== null).length)
+    : 0;
+
+  const hasCourses = groups.some((g) => g.id !== null);
 
   return (
     <div className="container">
@@ -35,7 +58,7 @@ export function LibraryScreen({ onStartTest }: Props) {
           </p>
         </div>
         <div className="lib-stats">
-          <div><span className="eyebrow">Modules</span><strong className="serif">{library.length}</strong></div>
+          <div><span className="eyebrow">Modules</span><strong className="serif">{(library as any[]).length}</strong></div>
           <div><span className="eyebrow">Avg high score</span><strong className="serif">{avgHigh}%</strong></div>
         </div>
       </header>
@@ -46,54 +69,70 @@ export function LibraryScreen({ onStartTest }: Props) {
         ))}
       </div>
 
-      {library.length === 0 && (
+      {isEmpty && (
         <div style={{ padding: "60px 0", textAlign: "center", color: "var(--ink-3)" }}>
-          <p className="serif" style={{ fontSize: 20 }}>No modules yet in this topic.</p>
+          <LayersIcon size={40} />
+          <p className="serif" style={{ fontSize: 20, marginTop: 16 }}>No modules available yet.</p>
+          <p style={{ fontSize: 14, color: "var(--ink-3)", marginTop: 4 }}>Your instructor will assign modules to you soon.</p>
         </div>
       )}
 
-      <ul className="lib-grid">
-        {library.map((it: any, i: number) => {
-          const c = topicColors[it.topic] || "158";
-          return (
-            <li key={it.id} className="lib-tile fade-up" style={{ animationDelay: `${180 + i * 50}ms`, ["--c" as any]: c }}>
-              <div className="tile-top">
-                <div className="tile-glyph" aria-hidden="true"><ModuleGlyph topic={it.topic} /></div>
-                <span className="tile-level mono">{it.cefr_level}</span>
-              </div>
-              <div className="tile-body">
-                <span className="eyebrow" style={{ textTransform: "capitalize" }}>{it.topic}</span>
-                <h3 className="serif" style={{ margin: "4px 0 10px", fontSize: 19 }}>{it.title}</h3>
-                <div className="tile-meta mono">
-                  <span>{it.questions_count} questions</span>
-                  <span className="dot-sep" />
-                  <span>{it.my_attempts} attempts</span>
-                </div>
-              </div>
-              <div className="tile-score">
-                {it.high_score !== null ? (
-                  <>
-                    <div className="hs">
-                      <span className="eyebrow">High score</span>
-                      <span className="hs-val serif">{it.high_score}%</span>
-                    </div>
-                    <ProgressBar value={(it.high_score || 0) / 100} />
-                  </>
-                ) : (
-                  <div className="hs-empty">
-                    <span className="eyebrow">Not attempted yet</span>
-                    <p className="mono" style={{ margin: 0, fontSize: 11, color: "var(--ink-3)" }}>Try this one →</p>
+      {/* Grouped sections (only show headers when there are real courses) */}
+      {groups.map((group) => (
+        <div key={group.id ?? "__other__"} style={{ marginBottom: 32 }}>
+          {hasCourses && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+              {group.id ? <LayersIcon size={14} /> : null}
+              <h2 className="serif" style={{ margin: 0, fontSize: 22, letterSpacing: "-0.015em" }}>{group.title}</h2>
+              <span className="mono" style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 2 }}>
+                {group.modules.length} module{group.modules.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+          )}
+          <ul className="lib-grid">
+            {group.modules.map((it: any, i: number) => {
+              const c = topicColors[it.topic] || "158";
+              return (
+                <li key={it.id} className="lib-tile fade-up" style={{ animationDelay: `${180 + i * 50}ms`, ["--c" as any]: c }}>
+                  <div className="tile-top">
+                    <div className="tile-glyph" aria-hidden="true"><ModuleGlyph topic={it.topic} /></div>
+                    <span className="tile-level mono">{it.cefr_level}</span>
                   </div>
-                )}
-              </div>
-              <button className="btn ghost tile-action" onClick={() => onStartTest(it.id)}>
-                {it.high_score !== null ? "Practice again" : "Start practice"}
-                <ArrowRightIcon size={14} />
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+                  <div className="tile-body">
+                    <span className="eyebrow" style={{ textTransform: "capitalize" }}>{it.topic}</span>
+                    <h3 className="serif" style={{ margin: "4px 0 10px", fontSize: 19 }}>{it.title}</h3>
+                    <div className="tile-meta mono">
+                      <span>{it.questions_count} questions</span>
+                      <span className="dot-sep" />
+                      <span>{it.my_attempts} attempts</span>
+                    </div>
+                  </div>
+                  <div className="tile-score">
+                    {it.high_score !== null ? (
+                      <>
+                        <div className="hs">
+                          <span className="eyebrow">High score</span>
+                          <span className="hs-val serif">{it.high_score}%</span>
+                        </div>
+                        <ProgressBar value={(it.high_score || 0) / 100} />
+                      </>
+                    ) : (
+                      <div className="hs-empty">
+                        <span className="eyebrow">Not attempted yet</span>
+                        <p className="mono" style={{ margin: 0, fontSize: 11, color: "var(--ink-3)" }}>Try this one →</p>
+                      </div>
+                    )}
+                  </div>
+                  <button className="btn ghost tile-action" onClick={() => onStartTest(it.id)}>
+                    {it.high_score !== null ? "Practice again" : "Start practice"}
+                    <ArrowRightIcon size={14} />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
 
       <style>{`
         .lib-head { display:grid; grid-template-columns:1.4fr 1fr; gap:24px; align-items:end; margin-bottom:22px; }

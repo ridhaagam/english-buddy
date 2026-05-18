@@ -1,6 +1,6 @@
 import { useState, Fragment, useRef, useCallback } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { PlusIcon, EditIcon, TrashIcon, XIcon, ArrowRightIcon } from "../../../components/ui";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { PlusIcon, EditIcon, TrashIcon, XIcon, ArrowRightIcon, UsersIcon, CheckIcon } from "../../../components/ui";
 import { api } from "../../../lib/api";
 
 const TOPICS = ["vocabulary", "grammar", "listening", "speaking", "writing"];
@@ -33,6 +33,7 @@ export function AdminModules() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [assignModuleId, setAssignModuleId] = useState<string | null>(null);
   const [form, setForm] = useState<ModuleForm>(blank);
   const [settings, setSettings] = useState<Settings>(blankSettings);
   const [qIdx, setQIdx] = useState<number | null>(null);
@@ -230,6 +231,7 @@ export function AdminModules() {
                       {m.status !== "published" && (
                         <button className="btn ghost sm" onClick={() => handlePublish(m.id)}>Publish</button>
                       )}
+                      <button className="icon-btn" title="Assign learners" onClick={() => setAssignModuleId(m.id)}><UsersIcon size={14} /></button>
                       <button className="icon-btn" onClick={() => openEdit(m)}><EditIcon size={14} /></button>
                       <button
                         className="icon-btn"
@@ -404,6 +406,10 @@ export function AdminModules() {
         </div>
       )}
 
+      {assignModuleId && (
+        <AssignLearnersModal moduleId={assignModuleId} onClose={() => setAssignModuleId(null)} />
+      )}
+
       <style>{`
         .adm-page { padding-top: 28px; }
         .mod-toast { position:fixed; bottom:28px; right:28px; z-index:9999; padding:12px 20px; border-radius:var(--r-md); font-size:14px; font-weight:600; font-family:var(--font-ui); box-shadow:0 4px 24px oklch(0 0 0/0.14); animation:toastIn 0.22s cubic-bezier(0.22,1,0.36,1); pointer-events:none; }
@@ -495,3 +501,103 @@ function QuestionMatchEditor({ q, onChange }: { q: Q; onChange: (p: any) => void
 
 const thStyle: React.CSSProperties = { padding: "12px 16px", textAlign: "left", fontSize: 11, fontFamily: "var(--font-mono)", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--ink-3)", fontWeight: 600, background: "var(--bg-2)" };
 const tdStyle: React.CSSProperties = { padding: "14px 16px", verticalAlign: "middle", fontSize: 14 };
+
+
+// ──────────────────────────────────────────────
+// Per-module learner assignment modal
+// ──────────────────────────────────────────────
+
+function AssignLearnersModal({ moduleId, onClose }: { moduleId: string; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [search, setSearch] = useState("");
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["module-assignments", moduleId],
+    queryFn: () => api.admin.courses.getModuleAssignments(moduleId),
+  });
+
+  // Build initial selection from direct assignments
+  const [directIds, setDirectIds] = useState<Set<string> | null>(null);
+
+  // Once data loads, seed directIds from the response
+  const learners: any[] = data?.learners ?? [];
+  if (data && directIds === null) {
+    setDirectIds(new Set(learners.filter((l: any) => l.access === "direct").map((l: any) => l.id)));
+  }
+
+  const selected = directIds ?? new Set<string>();
+
+  const save = useMutation({
+    mutationFn: () => api.admin.courses.setModuleAssignments(moduleId, Array.from(selected)),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["module-assignments", moduleId] });
+      onClose();
+    },
+  });
+
+  function toggle(id: string) {
+    setDirectIds((s) => {
+      const n = new Set(s ?? []);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+  }
+
+  const filtered = learners.filter((l: any) =>
+    !search || l.display_name.toLowerCase().includes(search.toLowerCase()) || l.email.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 400, display: "grid", placeItems: "center", padding: 24 }}>
+      <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: "var(--r-xl)", padding: "28px 24px", width: "100%", maxWidth: 480, boxShadow: "var(--shadow-md)", maxHeight: "90vh", overflowY: "auto" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <h3 className="serif" style={{ margin: 0, fontSize: 20 }}>Assign learners</h3>
+          <button className="icon-btn" onClick={onClose}><XIcon size={16} /></button>
+        </div>
+        <p style={{ margin: "0 0 14px", fontSize: 13, color: "var(--ink-2)" }}>
+          Check learners for direct access to this module. Course-enrolled learners already have access but are shown for reference.
+        </p>
+        <input className="input" style={{ width: "100%", marginBottom: 10, boxSizing: "border-box" }}
+          placeholder="Search learners…" value={search} onChange={(e) => setSearch(e.target.value)} autoFocus />
+        {isLoading ? (
+          <p style={{ color: "var(--ink-3)", fontSize: 13 }}>Loading…</p>
+        ) : filtered.length === 0 ? (
+          <p style={{ color: "var(--ink-3)", fontSize: 13 }}>No learners found.</p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 5, maxHeight: 340, overflowY: "auto" }}>
+            {filtered.map((l: any) => {
+              const viaCourse = l.access === "course";
+              const isDirect = selected.has(l.id);
+              return (
+                <label key={l.id} style={{
+                  display: "flex", alignItems: "center", gap: 10, padding: "9px 12px",
+                  borderRadius: "var(--r-sm)",
+                  background: isDirect ? "var(--accent-soft)" : viaCourse ? "oklch(0.96 0.02 158)" : "var(--bg-2)",
+                  border: `1px solid ${isDirect ? "var(--accent)" : viaCourse ? "oklch(0.82 0.05 158)" : "var(--line-2)"}`,
+                  cursor: viaCourse ? "default" : "pointer",
+                  opacity: viaCourse ? 0.8 : 1,
+                }}>
+                  <input type="checkbox" checked={isDirect || viaCourse} disabled={viaCourse}
+                    onChange={() => !viaCourse && toggle(l.id)}
+                    style={{ accentColor: "var(--accent)" }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: 13, fontWeight: 500 }}>{l.display_name}</span>
+                    <span style={{ marginLeft: 8, fontSize: 11, color: "var(--ink-3)" }}>{l.email}</span>
+                  </div>
+                  {viaCourse && <span className="mono" style={{ fontSize: 10, color: "oklch(0.45 0.1 158)", flexShrink: 0 }}>via course</span>}
+                  {isDirect && !viaCourse && <CheckIcon size={12} />}
+                </label>
+              );
+            })}
+          </div>
+        )}
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 14 }}>
+          <button className="btn ghost" onClick={onClose}>Cancel</button>
+          <button className="btn accent" disabled={save.isPending || isLoading} onClick={() => save.mutate()}>
+            {save.isPending ? "Saving…" : "Save assignments"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

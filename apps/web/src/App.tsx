@@ -17,6 +17,7 @@ import { AdminReports } from "./features/admin/reports/AdminReports";
 import { AdminUsers } from "./features/admin/users/AdminUsers";
 import { AdminAuditLog } from "./features/admin/audit-log/AdminAuditLog";
 import { AdminFaceTest } from "./features/admin/face-test/AdminFaceTest";
+import { AdminCourses } from "./features/admin/courses/AdminCourses";
 import { ProfileEditPage } from "./features/profile/ProfileEditPage";
 import { SessionDetailPage } from "./features/practice/SessionDetailPage";
 import { api } from "./lib/api";
@@ -32,6 +33,14 @@ export function App() {
   const [result, setResult] = useState<any>(null);
   const [adminMode, setAdminMode] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState<string | undefined>(undefined);
+  const [testResumeData, setTestResumeData] = useState<{ answeredQuestionIds: string[]; previousSessionId: string } | undefined>(undefined);
+  const [resumeDialog, setResumeDialog] = useState<{
+    moduleId: string;
+    answeredCount: number;
+    totalCount: number;
+    answeredQuestionIds: string[];
+    previousSessionId: string;
+  } | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem("access_token");
@@ -51,13 +60,32 @@ export function App() {
     setRoute("profile");
   }
 
-  function startTest(moduleId?: string) {
+  function launchTest(moduleId: string, resumeData?: { answeredQuestionIds: string[]; previousSessionId: string }) {
+    setTestResumeData(resumeData);
+    setTestModuleId(moduleId);
+    setResumeDialog(null);
+    setRoute("test");
+  }
+
+  async function startTest(moduleId?: string) {
     if (!moduleId) {
       setRoute("library");
       return;
     }
-    setTestModuleId(moduleId);
-    setRoute("test");
+    try {
+      const res = await api.sessions.resumable(moduleId);
+      if (res.resumable) {
+        setResumeDialog({
+          moduleId,
+          answeredCount: res.answered_count!,
+          totalCount: res.total_count!,
+          answeredQuestionIds: res.answered_question_ids!,
+          previousSessionId: res.session_id!,
+        });
+        return;
+      }
+    } catch {}
+    launchTest(moduleId);
   }
 
   function handleDone(res: any) {
@@ -92,6 +120,7 @@ export function App() {
         moduleId={testModuleId}
         onExit={() => setRoute("library")}
         onDone={handleDone}
+        resumeData={testResumeData}
       />
     );
   }
@@ -115,6 +144,7 @@ export function App() {
           switch (adminRoute) {
             case "dashboard": return <AdminDashboard />;
             case "modules": return <AdminModules />;
+            case "courses": return <AdminCourses />;
             case "import-doc": return <AdminImport />;
             case "import-audio": return <AdminListening />;
             case "results": return <AdminResults />;
@@ -170,6 +200,22 @@ export function App() {
           />
         )}
       </div>
+      {resumeDialog && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 300, display: "grid", placeItems: "center", padding: 24 }}>
+          <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: "var(--r-xl)", padding: "32px 28px", maxWidth: 420, width: "100%", boxShadow: "var(--shadow-md)" }}>
+            <p className="serif" style={{ margin: "0 0 8px", fontSize: 22, letterSpacing: "-0.015em" }}>Continue where you left off?</p>
+            <p style={{ margin: "0 0 24px", color: "var(--ink-2)", fontSize: 14, lineHeight: 1.6 }}>
+              You already answered <strong>{resumeDialog.answeredCount}</strong> of <strong>{resumeDialog.totalCount}</strong> questions last time. Resume to skip those and finish the remaining {resumeDialog.totalCount - resumeDialog.answeredCount}.
+            </p>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button className="btn ghost" onClick={() => launchTest(resumeDialog.moduleId)}>Start fresh</button>
+              <button className="btn accent" onClick={() => launchTest(resumeDialog.moduleId, { answeredQuestionIds: resumeDialog.answeredQuestionIds, previousSessionId: resumeDialog.previousSessionId })}>
+                Resume ({resumeDialog.answeredCount}/{resumeDialog.totalCount})
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <style>{`
         .app-wrap { min-height:100vh; display:flex; flex-direction:column; background:var(--bg); }
         .page-body { flex:1; }

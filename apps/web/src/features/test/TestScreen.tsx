@@ -1,4 +1,22 @@
 import { useState, useEffect, useRef, useMemo, forwardRef, useImperativeHandle, useCallback } from "react";
+
+// Module-level singleton: starts loading face-api as soon as TestScreen.tsx is first imported,
+// so by the time the user grants camera consent the weights are already downloaded.
+let faceApiReady: Promise<any> | null = null;
+function getFaceApi(): Promise<any> {
+  if (!faceApiReady) {
+    faceApiReady = import("face-api.js").then(async (faceapi) => {
+      try { await (faceapi as any).tf.setBackend("cpu"); } catch {}
+      await (faceapi as any).tf.ready();
+      await faceapi.nets.tinyFaceDetector.loadFromUri("/face-api-weights");
+      return faceapi;
+    }).catch((err) => {
+      faceApiReady = null; // allow retry on next attempt
+      throw err;
+    });
+  }
+  return faceApiReady;
+}
 import { useQuery } from "@tanstack/react-query";
 import { ProgressBar, XIcon, ClockIcon, ArrowRightIcon, CheckIcon } from "../../components/ui";
 import { api } from "../../lib/api";
@@ -7,9 +25,10 @@ type Props = {
   moduleId: string;
   onExit: () => void;
   onDone: (result: any) => void;
+  resumeData?: { answeredQuestionIds: string[]; previousSessionId: string };
 };
 
-export function TestScreen({ moduleId, onExit, onDone }: Props) {
+export function TestScreen({ moduleId, onExit, onDone, resumeData }: Props) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [idx, setIdx] = useState(0);
@@ -39,12 +58,15 @@ export function TestScreen({ moduleId, onExit, onDone }: Props) {
     setSessionId: (id: string) => void;
   }>(null);
 
+  // Kick off face-api preload immediately — well before camera consent is given
+  useEffect(() => { getFaceApi().catch(() => {}); }, []);
+
   // Step 1: Create session immediately on mount (no module pre-fetch needed)
   useEffect(() => {
-    api.sessions.create(moduleId)
+    api.sessions.create(moduleId, resumeData?.previousSessionId)
       .then((data) => {
         setSessionId(data.id);
-        api.sessions.logEvent(data.id, "open").catch(() => {});
+        api.sessions.logEvent(data.id, resumeData ? "resume" : "open").catch(() => {});
       })
       .catch((err: Error) => {
         setSessionError(err.message ?? "Failed to start this module");
@@ -63,7 +85,12 @@ export function TestScreen({ moduleId, onExit, onDone }: Props) {
     return () => clearInterval(t);
   }, []);
 
-  const questions = module?.questions || [];
+  const questions = useMemo(() => {
+    const allQ: any[] = module?.questions || [];
+    if (!resumeData?.answeredQuestionIds?.length) return allQ;
+    const skip = new Set(resumeData.answeredQuestionIds);
+    return allQ.filter((q) => !skip.has(q.id));
+  }, [module?.questions, resumeData]);
   const q = questions[idx];
 
   // beforeunload guard — warns if user tries to close tab/refresh mid-session
@@ -208,13 +235,13 @@ export function TestScreen({ moduleId, onExit, onDone }: Props) {
           a.questionId === qId ? { ...a, is_correct: res?.is_correct ?? false } : a
         );
 
+        if (camRef.current) await camRef.current.stopAndUpload(sessionId);
         const result = await api.sessions.finish(sessionId, {
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           tab_switch_count: tabSwitchCount,
           face_anomaly_count: faceAnomalyCount,
         });
         api.sessions.logEvent(sessionId, "close").catch(() => {});
-        if (camRef.current) await camRef.current.stopAndUpload(sessionId);
         onDone({
           ...result,
           session_id: sessionId,
@@ -718,55 +745,48 @@ const CameraCapture = forwardRef<
         };
         recorder.start(3000);
 
-        // Face detection runs on CPU backend to avoid WebGL→CPU sync stalls that
-        // freeze the main thread for 2–4 s and create large gaps in the recording.
-        // We also feed a 160×120 thumbnail (6× fewer pixels) for faster CPU inference.
-        import("face-api.js").then(async (faceapi) => {
-          try {
-            try { await (faceapi as any).tf.setBackend("cpu"); } catch {}
-            await (faceapi as any).tf.ready();
-            await faceapi.nets.tinyFaceDetector.loadFromUri("/face-api-weights");
-            setFaceDetAvail(true);
-            const thumbCanvas = document.createElement("canvas");
-            thumbCanvas.width = 160;
-            thumbCanvas.height = 120;
-            const thumbCtx = thumbCanvas.getContext("2d")!;
-            while (faceActive) {
-              await new Promise<void>((r) => setTimeout(r, 5000));
+        // Model is pre-warmed by the module-level singleton — getFaceApi() resolves
+        // immediately if weights are already loaded (no 3-second delay after consent).
+        // CPU backend feeds a 160×120 thumbnail (6× fewer pixels) for fast inference.
+        getFaceApi().then(async (faceapi) => {
+          setFaceDetAvail(true);
+          const thumbCanvas = document.createElement("canvas");
+          thumbCanvas.width = 160;
+          thumbCanvas.height = 120;
+          const thumbCtx = thumbCanvas.getContext("2d")!;
+          while (faceActive) {
+            await new Promise<void>((r) => setTimeout(r, 5000));
+            if (!faceActive) break;
+            if (!videoRef.current || videoRef.current.readyState < 2) continue;
+            try {
+              thumbCtx.drawImage(videoRef.current, 0, 0, 160, 120);
+              const results = await faceapi
+                .detectAllFaces(thumbCanvas, new faceapi.TinyFaceDetectorOptions({ scoreThreshold: 0.5 }))
+                .run();
               if (!faceActive) break;
-              if (!videoRef.current || videoRef.current.readyState < 2) continue;
-              try {
-                thumbCtx.drawImage(videoRef.current, 0, 0, 160, 120);
-                const results = await faceapi
-                  .detectAllFaces(thumbCanvas, new faceapi.TinyFaceDetectorOptions({ scoreThreshold: 0.5 }))
-                  .run();
-                if (!faceActive) break;
-                const count = results.length;
-                setFaceCount(count);
+              const count = results.length;
+              setFaceCount(count);
 
-                let anomaly = count !== 1;
-                let gazeGood = count === 1;
+              let anomaly = count !== 1;
+              let gazeGood = count === 1;
 
-                if (count === 1) {
-                  const { x, y, width, height } = results[0].box;
-                  const cx = (x + width / 2) / 160;
-                  const cy = (y + height / 2) / 120;
-                  if (cx < 0.2 || cx > 0.8 || cy < 0.1 || cy > 0.9) {
-                    anomaly = true;
-                    gazeGood = false;
-                  }
+              if (count === 1) {
+                const { x, y, width, height } = results[0].box;
+                const cx = (x + width / 2) / 160;
+                const cy = (y + height / 2) / 120;
+                if (cx < 0.2 || cx > 0.8 || cy < 0.1 || cy > 0.9) {
+                  anomaly = true;
+                  gazeGood = false;
                 }
+              }
 
-                setGazeOk(gazeGood);
-                if (anomaly) {
-                  onFaceAnomaly(currentQIdRef.current);
-                  setFaceAlert(true);
-                  setTimeout(() => setFaceAlert(false), 3000);
-                }
-              } catch {}
-            }
-          } catch {
-            setFaceDetAvail(false);
+              setGazeOk(gazeGood);
+              if (anomaly) {
+                onFaceAnomaly(currentQIdRef.current);
+                setFaceAlert(true);
+                setTimeout(() => setFaceAlert(false), 3000);
+              }
+            } catch {}
           }
         }).catch(() => setFaceDetAvail(false));
       })
