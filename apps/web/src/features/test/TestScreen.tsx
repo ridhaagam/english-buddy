@@ -701,20 +701,27 @@ const CameraCapture = forwardRef<
         };
         recorder.start(3000);
 
-        // Sequential async detection loop — each inference waits for the previous to complete,
-        // preventing GPU saturation that causes the live video feed to freeze
+        // Face detection runs on CPU backend to avoid WebGL→CPU sync stalls that
+        // freeze the main thread for 2–4 s and create large gaps in the recording.
+        // We also feed a 160×120 thumbnail (6× fewer pixels) for faster CPU inference.
         import("face-api.js").then(async (faceapi) => {
           try {
-            try { await (faceapi as any).tf.setBackend("webgl"); } catch {}
+            try { await (faceapi as any).tf.setBackend("cpu"); } catch {}
+            await (faceapi as any).tf.ready();
             await faceapi.nets.tinyFaceDetector.loadFromUri("/face-api-weights");
             setFaceDetAvail(true);
+            const thumbCanvas = document.createElement("canvas");
+            thumbCanvas.width = 160;
+            thumbCanvas.height = 120;
+            const thumbCtx = thumbCanvas.getContext("2d")!;
             while (faceActive) {
-              await new Promise<void>((r) => setTimeout(r, 2000));
+              await new Promise<void>((r) => setTimeout(r, 5000));
               if (!faceActive) break;
               if (!videoRef.current || videoRef.current.readyState < 2) continue;
               try {
+                thumbCtx.drawImage(videoRef.current, 0, 0, 160, 120);
                 const results = await faceapi
-                  .detectAllFaces(videoRef.current, new faceapi.TinyFaceDetectorOptions({ scoreThreshold: 0.5 }))
+                  .detectAllFaces(thumbCanvas, new faceapi.TinyFaceDetectorOptions({ scoreThreshold: 0.5 }))
                   .run();
                 if (!faceActive) break;
                 const count = results.length;
@@ -725,10 +732,8 @@ const CameraCapture = forwardRef<
 
                 if (count === 1) {
                   const { x, y, width, height } = results[0].box;
-                  const vw = videoRef.current.videoWidth || 480;
-                  const vh = videoRef.current.videoHeight || 360;
-                  const cx = (x + width / 2) / vw;
-                  const cy = (y + height / 2) / vh;
+                  const cx = (x + width / 2) / 160;
+                  const cy = (y + height / 2) / 120;
                   if (cx < 0.2 || cx > 0.8 || cy < 0.1 || cy > 0.9) {
                     anomaly = true;
                     gazeGood = false;
