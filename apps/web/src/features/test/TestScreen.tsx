@@ -673,20 +673,37 @@ const CameraCapture = forwardRef<
     }
 
     let faceActive = true;
+    let rAFActive = true;
 
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 480 }, height: { ideal: 360 }, frameRate: { max: 24 } } })
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
       .then((stream) => {
         streamRef.current = stream;
-        // If the video element is already mounted, wire it up immediately
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           videoRef.current.play().catch(() => {});
         }
         setStatus("active");
 
+        // Record from a fixed 480×360 canvas so output resolution and frame rate
+        // are always exact — getUserMedia frame-rate constraints are advisory-only
+        // in Chrome and are regularly ignored.
+        const recCanvas = document.createElement("canvas");
+        recCanvas.width = 480;
+        recCanvas.height = 360;
+        const recCtx = recCanvas.getContext("2d")!;
+        const drawToCanvas = () => {
+          if (!rAFActive) return;
+          if (videoRef.current && videoRef.current.readyState >= 2) {
+            recCtx.drawImage(videoRef.current, 0, 0, 480, 360);
+          }
+          requestAnimationFrame(drawToCanvas);
+        };
+        requestAnimationFrame(drawToCanvas);
+
+        const canvasStream = recCanvas.captureStream(15); // exactly 15 fps
         const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp8")
           ? "video/webm;codecs=vp8" : "video/webm";
-        const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 400_000 });
+        const recorder = new MediaRecorder(canvasStream, { mimeType, videoBitsPerSecond: 400_000 });
         recorderRef.current = recorder;
         chunkCounterRef.current = 0;
         recorder.ondataavailable = (e) => {
@@ -768,6 +785,7 @@ const CameraCapture = forwardRef<
 
     return () => {
       faceActive = false;
+      rAFActive = false;
       streamRef.current?.getTracks().forEach((t) => t.stop());
     };
   }, [consent, retryCount]);

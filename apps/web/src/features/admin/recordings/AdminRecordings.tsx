@@ -311,7 +311,7 @@ export function AdminResults() {
                     </button>
                   ) : playUrl ? (
                     <video controls preload="metadata" src={playUrl}
-                      style={{ width: "100%", borderRadius: 10, maxHeight: 300, background: "#000", display: "block" }} />
+                      style={{ width: "100%", borderRadius: 10, aspectRatio: "4/3", background: "#000", display: "block" }} />
                   ) : (
                     <div style={{ padding: "24px", textAlign: "center", color: "var(--ink-3)", fontSize: 13 }}>Loading recording…</div>
                   )

@@ -154,7 +154,7 @@ export function SessionDetailPage({ sessionId, onBack, onPracticeAgain }: Props)
               ▶ Play session recording
             </button>
           ) : playUrl ? (
-            <video controls preload="metadata" style={{ width: "100%", borderRadius: "var(--r-md)", maxHeight: 260 }} src={playUrl} />
+            <video controls preload="metadata" style={{ width: "100%", borderRadius: "var(--r-md)", aspectRatio: "4/3" }} src={playUrl} />
           ) : (
             <div style={{ padding: "20px 0", textAlign: "center", color: "var(--ink-3)" }}>Loading…</div>
           )}
