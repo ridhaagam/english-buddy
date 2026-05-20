@@ -44,6 +44,11 @@ export function TestScreen({ moduleId, onExit, onDone, resumeData }: Props) {
   const [tabAlert, setTabAlert] = useState(false);
   const [exitDialog, setExitDialog] = useState(false);
   const [finishing, setFinishing] = useState(false);
+  const [revealData, setRevealData] = useState<{
+    correctId: string; chosenId: string | null; isCorrect: boolean;
+    explain: string | null; choices: Array<{id: string; label: string}>; isLast: boolean;
+    lastPayload: any;
+  } | null>(null);
   const startRef = useRef(Date.now());
   const qStartRef = useRef(Date.now());
   // answersRef mirrors answers state — always up-to-date even inside async callbacks
@@ -209,39 +214,75 @@ export function TestScreen({ moduleId, onExit, onDone, resumeData }: Props) {
       face_anomaly: meta.face_anomaly,
     };
 
+    const correctId: string = q.payload?.answer || "";
+    const chosenId = (q.kind === "choice" || q.kind === "fill" || q.kind === "listen_choice") ? selected : null;
+    const isCorrect = !!(correctId && chosenId && chosenId === correctId);
+    const correctLabel = choices.find((c: any) => c.id === correctId)?.label || correctId;
+
     const localAnswer = {
       questionId: q.id,
       selection,
-      is_correct: false, // updated when API responds
+      is_correct: isCorrect,
       prompt: q.prompt,
-      correct_answer: q.payload?.answer || "",
+      correct_answer: correctLabel,
+      choices: [...choices],
+      explain: q.explain || null,
+      chosen_id: chosenId,
+      correct_id: correctId,
     };
 
-    // Append to both ref (source of truth) and state (for UI)
     answersRef.current = [...answersRef.current, localAnswer];
     setAnswers([...answersRef.current]);
 
-    if (last) {
-      // For the final question: wait for all background saves, then save last + finish
+    // Show feedback immediately — API call happens in background
+    setRevealData({
+      correctId,
+      chosenId,
+      isCorrect,
+      explain: q.explain || null,
+      choices: [...choices],
+      isLast: last,
+      lastPayload: answerPayload,
+    });
+
+    if (!last) {
+      const capturedQId = q.id;
+      const p = api.sessions.answer(sessionId, answerPayload)
+        .then((res) => {
+          answersRef.current = answersRef.current.map((a) =>
+            a.questionId === capturedQId ? { ...a, is_correct: res?.is_correct ?? isCorrect } : a
+          );
+          setAnswers([...answersRef.current]);
+        })
+        .catch(() => {});
+      pendingRef.current.push(p);
+    }
+  }
+
+  async function handleContinue() {
+    const rd = revealData;
+    if (!rd) return;
+    setRevealData(null);
+
+    if (rd.isLast) {
       setFinishing(true);
       try {
         await Promise.allSettled(pendingRef.current);
         pendingRef.current = [];
 
-        const res = await api.sessions.answer(sessionId, answerPayload);
-        // Update last answer's is_correct in the ref
-        const qId = q.id;
+        const res = await api.sessions.answer(sessionId!, rd.lastPayload);
+        const qId = rd.lastPayload.question_id;
         answersRef.current = answersRef.current.map((a) =>
-          a.questionId === qId ? { ...a, is_correct: res?.is_correct ?? false } : a
+          a.questionId === qId ? { ...a, is_correct: res?.is_correct ?? rd.isCorrect } : a
         );
 
-        if (camRef.current) await camRef.current.stopAndUpload(sessionId);
-        const result = await api.sessions.finish(sessionId, {
+        if (camRef.current) await camRef.current.stopAndUpload(sessionId!);
+        const result = await api.sessions.finish(sessionId!, {
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           tab_switch_count: tabSwitchCount,
           face_anomaly_count: faceAnomalyCount,
         });
-        api.sessions.logEvent(sessionId, "close").catch(() => {});
+        api.sessions.logEvent(sessionId!, "close").catch(() => {});
         onDone({
           ...result,
           session_id: sessionId,
@@ -251,26 +292,13 @@ export function TestScreen({ moduleId, onExit, onDone, resumeData }: Props) {
           answers_revealed: (result as any).answers_revealed ?? true,
         });
       } catch {
-        if (camRef.current) await camRef.current.stopAndUpload(sessionId).catch(() => {});
+        if (camRef.current) await camRef.current.stopAndUpload(sessionId!).catch(() => {});
         onDone({ score_pct: 0, session_id: sessionId, module_id: moduleId, answers: answersRef.current, timeMs: 0 });
       }
-      return;
+    } else {
+      setIdx((i) => i + 1);
+      resetQ();
     }
-
-    // Non-last question: advance immediately (optimistic), save in background
-    setIdx((i) => i + 1);
-    resetQ();
-
-    const capturedQId = q.id;
-    const p = api.sessions.answer(sessionId, answerPayload)
-      .then((res) => {
-        answersRef.current = answersRef.current.map((a) =>
-          a.questionId === capturedQId ? { ...a, is_correct: res?.is_correct ?? false } : a
-        );
-        setAnswers([...answersRef.current]);
-      })
-      .catch(() => {});
-    pendingRef.current.push(p);
   }
 
   return (
@@ -326,65 +354,96 @@ export function TestScreen({ moduleId, onExit, onDone, resumeData }: Props) {
             />
           )}
 
-          {(q.kind === "choice" || q.kind === "listen_choice" || q.kind === "fill") && (
-            <ul className="choices">
-              {choices.map((c: any, i: number) => (
-                <li key={c.id} className="choice" data-sel={selected === c.id ? true : undefined}
-                  style={{ animationDelay: `${i * 55}ms` }} onClick={() => setSelected(c.id)}>
-                  <span className="choice-key mono">{String.fromCharCode(65 + i)}</span>
-                  <span className="choice-label">{c.label}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {q.kind === "fill" && choices.length === 0 && (
-            <input
-              className="fill-input"
-              placeholder="Type your answer…"
-              value={fillInput}
-              onChange={(e) => setFillInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && canSubmit && submit()}
-              autoFocus
-            />
-          )}
-
-          {q.kind === "match" && (
-            <div className="match-grid">
-              <ul className="match-col">
-                <li className="match-col-head eyebrow">Term</li>
-                {pairs.map((p: any) => {
-                  const matched = matchPairs[p.left];
-                  const isSel = matchSel?.side === "L" && matchSel.value === p.left;
-                  return (
-                    <li key={p.left} className="match-cell" data-sel={isSel ? true : undefined} data-matched={!!matched ? true : undefined}
-                      onClick={() => matched ? setMatchPairs((m) => { const c = { ...m }; delete c[p.left]; return c; }) : pickMatch("L", p.left)}>
-                      <span className="serif match-word">{p.left}</span>
-                      {matched && <span className="match-tag mono">→ {matched}</span>}
-                    </li>
-                  );
-                })}
+          {revealData ? (
+            <>
+              <ul className="choices">
+                {revealData.choices.map((c: any, i: number) => (
+                  <li key={c.id} className="choice"
+                    data-correct={c.id === revealData.correctId ? true : undefined}
+                    data-wrong={c.id === revealData.chosenId && c.id !== revealData.correctId ? true : undefined}
+                    style={{ pointerEvents: "none", animationDelay: `${i * 30}ms` }}>
+                    <span className="choice-key mono">
+                      {c.id === revealData.correctId ? "✓" : c.id === revealData.chosenId ? "✗" : String.fromCharCode(65 + i)}
+                    </span>
+                    <span className="choice-label">{c.label}</span>
+                  </li>
+                ))}
               </ul>
-              <ul className="match-col">
-                <li className="match-col-head eyebrow">Meaning</li>
-                {rightCol.map((r: string) => {
-                  const used = matchedRights.has(r);
-                  const isSel = matchSel?.side === "R" && matchSel.value === r;
-                  return (
-                    <li key={r} className="match-cell right" data-sel={isSel ? true : undefined} data-used={used ? true : undefined}
-                      onClick={() => !used && pickMatch("R", r)}>{r}
+              {revealData.explain && (
+                <div className="explain-box">
+                  <p className="eyebrow" style={{ marginBottom: 8, color: "var(--ink-3)" }}>Penjelasan / Explanation</p>
+                  <p className="explain-text">{revealData.explain}</p>
+                </div>
+              )}
+              <div className="q-footer">
+                <button className="btn accent lg q-submit" onClick={handleContinue} disabled={finishing}>
+                  {revealData.isLast ? (finishing ? "Finalizing…" : "See my score") : "Continue"} <ArrowRightIcon size={16} />
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              {(q.kind === "choice" || q.kind === "listen_choice" || q.kind === "fill") && (
+                <ul className="choices">
+                  {choices.map((c: any, i: number) => (
+                    <li key={c.id} className="choice" data-sel={selected === c.id ? true : undefined}
+                      style={{ animationDelay: `${i * 55}ms` }} onClick={() => setSelected(c.id)}>
+                      <span className="choice-key mono">{String.fromCharCode(65 + i)}</span>
+                      <span className="choice-label">{c.label}</span>
                     </li>
-                  );
-                })}
-              </ul>
-            </div>
-          )}
+                  ))}
+                </ul>
+              )}
 
-          <div className="q-footer">
-            <button className="btn accent lg q-submit" disabled={!canSubmit} onClick={submit}>
-              {last ? "Submit & see score" : "Next question"} <ArrowRightIcon size={16} />
-            </button>
-          </div>
+              {q.kind === "fill" && choices.length === 0 && (
+                <input
+                  className="fill-input"
+                  placeholder="Type your answer…"
+                  value={fillInput}
+                  onChange={(e) => setFillInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && canSubmit && submit()}
+                  autoFocus
+                />
+              )}
+
+              {q.kind === "match" && (
+                <div className="match-grid">
+                  <ul className="match-col">
+                    <li className="match-col-head eyebrow">Term</li>
+                    {pairs.map((p: any) => {
+                      const matched = matchPairs[p.left];
+                      const isSel = matchSel?.side === "L" && matchSel.value === p.left;
+                      return (
+                        <li key={p.left} className="match-cell" data-sel={isSel ? true : undefined} data-matched={!!matched ? true : undefined}
+                          onClick={() => matched ? setMatchPairs((m) => { const c = { ...m }; delete c[p.left]; return c; }) : pickMatch("L", p.left)}>
+                          <span className="serif match-word">{p.left}</span>
+                          {matched && <span className="match-tag mono">→ {matched}</span>}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  <ul className="match-col">
+                    <li className="match-col-head eyebrow">Meaning</li>
+                    {rightCol.map((r: string) => {
+                      const used = matchedRights.has(r);
+                      const isSel = matchSel?.side === "R" && matchSel.value === r;
+                      return (
+                        <li key={r} className="match-cell right" data-sel={isSel ? true : undefined} data-used={used ? true : undefined}
+                          onClick={() => !used && pickMatch("R", r)}>{r}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
+
+              <div className="q-footer">
+                <button className="btn accent lg q-submit" disabled={!canSubmit} onClick={submit}>
+                  {last ? "Submit & see score" : "Next question"} <ArrowRightIcon size={16} />
+                </button>
+              </div>
+            </>
+          )}
         </section>
 
         <aside className="camera-pane fade-up" style={{ animationDelay: "100ms" }}>
@@ -472,6 +531,12 @@ export function TestScreen({ moduleId, onExit, onDone, resumeData }: Props) {
         .choice[data-sel] { border-color:var(--accent); background:var(--accent-soft); }
         .choice-key { width:28px;height:28px; border-radius:8px; background:var(--bg-2); color:var(--ink-2); display:grid; place-items:center; font-size:12px; flex-shrink:0; border:1px solid var(--line); transition:background 0.15s,color 0.15s,border-color 0.15s; }
         .choice[data-sel] .choice-key { background:var(--accent); color:white; border-color:transparent; }
+        .choice[data-correct] { border-color:oklch(0.45 0.14 158); background:oklch(0.94 0.04 158); }
+        .choice[data-correct] .choice-key { background:oklch(0.45 0.14 158); color:white; border-color:transparent; }
+        .choice[data-wrong] { border-color:oklch(0.6 0.15 25); background:oklch(0.96 0.03 25); }
+        .choice[data-wrong] .choice-key { background:oklch(0.6 0.15 25); color:white; border-color:transparent; }
+        .explain-box { background:oklch(0.97 0.01 240); border:1px solid oklch(0.88 0.03 240); border-radius:var(--r-md); padding:16px 18px; margin-bottom:20px; }
+        .explain-text { font-size:13px; color:var(--ink-2); line-height:1.75; white-space:pre-wrap; margin:0; }
         .choice-label { flex:1; font-weight:500; font-size:15px; line-height:1.4; }
         .fill-input { width:100%; padding:14px 16px; border:1.5px solid var(--line); border-radius:var(--r-md); font-size:16px; background:var(--bg); color:var(--ink); margin-bottom:24px; box-sizing:border-box; }
         .fill-input:focus { outline:none; border-color:var(--accent); }

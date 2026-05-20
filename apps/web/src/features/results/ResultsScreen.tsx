@@ -114,13 +114,43 @@ export function ResultsScreen({ result, onRetry, onHome }: Props) {
           <div className="ans-list">
             <p className="eyebrow" style={{ marginBottom: 10 }}>Answer breakdown</p>
             {answers.map((a: any, i: number) => (
-              <div key={i} className="ans-row">
-                <div className={`ans-icon ${a.is_correct ? "correct" : "wrong"}`}>
-                  {a.is_correct ? <CheckIcon size={12} /> : <XIcon size={12} />}
+              <div key={i} className={`ans-block ${a.is_correct ? "ans-correct" : "ans-wrong"}`}>
+                <div className="ans-row">
+                  <div className={`ans-icon ${a.is_correct ? "correct" : "wrong"}`}>
+                    {a.is_correct ? <CheckIcon size={12} /> : <XIcon size={12} />}
+                  </div>
+                  <span style={{ flex: 1, fontSize: 14, fontWeight: 500 }}>{a.prompt || `Question ${i + 1}`}</span>
+                  <span className={`ans-verdict mono ${a.is_correct ? "v-correct" : "v-wrong"}`}>
+                    {a.is_correct ? "Benar ✓" : "Salah ✗"}
+                  </span>
                 </div>
-                <span style={{ flex: 1, fontSize: 14 }}>{a.prompt || `Question ${i + 1}`}</span>
-                {a.correct_answer && !a.is_correct && (
-                  <span className="ans-hint mono">{a.correct_answer}</span>
+
+                {a.choices && a.choices.length > 0 && (
+                  <div className="ans-choices">
+                    {a.choices.map((c: any) => {
+                      const isCorrect = c.id === a.correct_id;
+                      const isChosen = c.id === a.chosen_id;
+                      return (
+                        <div key={c.id} className={`ans-choice ${isCorrect ? "ac-correct" : isChosen ? "ac-wrong" : "ac-neutral"}`}>
+                          <span className="ac-key mono">{isCorrect ? "✓" : isChosen ? "✗" : c.id.toUpperCase()}</span>
+                          <span className="ac-label">{c.label}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {!a.choices?.length && !a.is_correct && a.correct_answer && (
+                  <div style={{ marginTop: 6, paddingLeft: 36, fontSize: 13, color: "var(--ink-2)" }}>
+                    Jawaban benar / Correct answer: <strong style={{ color: "oklch(0.4 0.12 158)" }}>{a.correct_answer}</strong>
+                  </div>
+                )}
+
+                {a.explain && (
+                  <div className="ans-explain">
+                    <p className="eyebrow" style={{ fontSize: 10, marginBottom: 6, color: "var(--ink-3)" }}>Penjelasan / Explanation</p>
+                    <p style={{ margin: 0, fontSize: 12, color: "var(--ink-2)", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{a.explain}</p>
+                  </div>
                 )}
               </div>
             ))}
@@ -146,12 +176,29 @@ export function ResultsScreen({ result, onRetry, onHome }: Props) {
         .res-headline { flex:1; }
         .res-chips { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
         .chip { background:var(--bg-2); border:1px solid var(--line); border-radius:var(--r-md); padding:14px 16px; display:flex; flex-direction:column; gap:4px; }
-        .ans-list { display:flex; flex-direction:column; gap:8px; }
-        .ans-row { display:flex; align-items:center; gap:12px; padding:10px 12px; background:var(--bg-2); border-radius:var(--r-sm); }
+        .ans-list { display:flex; flex-direction:column; gap:10px; }
+        .ans-block { border-radius:var(--r-md); overflow:hidden; border:1px solid var(--line); }
+        .ans-block.ans-correct { border-color:oklch(0.82 0.07 158); }
+        .ans-block.ans-wrong { border-color:oklch(0.85 0.06 25); }
+        .ans-row { display:flex; align-items:center; gap:12px; padding:10px 12px; background:var(--bg-2); }
+        .ans-block.ans-correct .ans-row { background:oklch(0.96 0.03 158); }
+        .ans-block.ans-wrong .ans-row { background:oklch(0.97 0.02 25); }
         .ans-icon { width:24px;height:24px; border-radius:50%; display:grid; place-items:center; flex-shrink:0; }
         .ans-icon.correct { background:var(--accent-soft); color:var(--accent-ink); }
         .ans-icon.wrong { background:oklch(0.95 0.04 25); color:oklch(0.5 0.1 25); }
-        .ans-hint { font-size:11px; color:var(--ink-3); max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .ans-verdict { font-size:11px; letter-spacing:.04em; padding:3px 8px; border-radius:999px; }
+        .v-correct { background:var(--accent-soft); color:var(--accent-ink); }
+        .v-wrong { background:oklch(0.95 0.04 25); color:oklch(0.5 0.1 25); }
+        .ans-choices { display:flex; flex-direction:column; gap:4px; padding:10px 12px; background:var(--surface); }
+        .ans-choice { display:flex; align-items:center; gap:10px; padding:7px 10px; border-radius:8px; font-size:13px; }
+        .ac-correct { background:oklch(0.94 0.04 158); }
+        .ac-wrong { background:oklch(0.96 0.03 25); }
+        .ac-neutral { opacity:0.55; }
+        .ac-key { width:22px;height:22px; border-radius:6px; display:grid; place-items:center; font-size:11px; flex-shrink:0; background:var(--bg-2); color:var(--ink-3); }
+        .ac-correct .ac-key { background:oklch(0.45 0.14 158); color:white; }
+        .ac-wrong .ac-key { background:oklch(0.6 0.15 25); color:white; }
+        .ac-label { flex:1; line-height:1.4; }
+        .ans-explain { padding:10px 12px 14px; background:oklch(0.98 0.005 240); border-top:1px solid var(--line); }
         .res-actions { display:flex; gap:12px; justify-content:flex-end; padding-top:4px; border-top:1px solid var(--line-2); }
         @media(max-width:560px) { .res-top{flex-direction:column;text-align:center} .res-chips{grid-template-columns:1fr 1fr} .res-actions{flex-direction:column} .res-actions .btn{width:100%;justify-content:center} }
       `}</style>

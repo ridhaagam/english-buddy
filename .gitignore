@@ -64,3 +64,8 @@ apps/api/alembic/__pycache__/
 BUILD_PROMPT.md
 index.html
 vocabulary.pdf
+30_days_english.html
+
+# Local development seed scripts (contain personal data)
+apps/api/seed_dewi.py
+apps/api/update_explains.py

@@ -668,7 +668,7 @@ ALL_MODULES = VOCAB_MODULES + GRAMMAR_MODULES + [SPEAKING_MODULE]
 
 async def seed():
     async with AsyncSessionLocal() as db:
-        result = await db.execute(select(User).where(User.email == "agam@gmail.com"))
+        result = await db.execute(select(User).where(User.email == "admin@example.com"))
         if result.scalar_one_or_none():
             print("✓ Already seeded, skipping.")
             return
@@ -676,9 +676,9 @@ async def seed():
         print("Seeding database...")
 
         owner = User(
-            email="agam@gmail.com",
-            display_name="Agam Admin",
-            password_hash=hash_password("agam123"),
+            email="admin@example.com",
+            display_name="Admin",
+            password_hash=hash_password("admin123"),
             role=UserRole.owner,
             streak=0,
             xp_total=0,
@@ -686,9 +686,9 @@ async def seed():
         db.add(owner)
 
         learner = User(
-            email="gery@gmail.com",
-            display_name="Gery Learner",
-            password_hash=hash_password("123456"),
+            email="student@example.com",
+            display_name="Student",
+            password_hash=hash_password("student123"),
             role=UserRole.learner,
             streak=3,
             xp_total=450,
@@ -766,8 +766,8 @@ async def seed():
 
         await db.commit()
         print("✓ Database seeded successfully.")
-        print("  Admin:   agam@gmail.com / agam123")
-        print("  Learner: gery@gmail.com / 123456")
+        print("  Admin:   admin@example.com / admin123")
+        print("  Student: student@example.com / student123")
 
 
 if __name__ == "__main__":

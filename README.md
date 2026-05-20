@@ -66,8 +66,8 @@ cd english-buddy
 
 | Account | Email | Password |
 |---|---|---|
-| Owner (admin) | agam@gmail.com | agam123 |
-| Learner | gery@gmail.com | 000000 |
+| Admin (owner) | admin@example.com | admin123 |
+| Student (learner) | student@example.com | student123 |
 
 The app runs at **http://localhost:5173**.
 
