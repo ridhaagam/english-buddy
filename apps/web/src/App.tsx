@@ -21,6 +21,7 @@ import { AdminCourses } from "./features/admin/courses/AdminCourses";
 import { ProfileEditPage } from "./features/profile/ProfileEditPage";
 import { SessionDetailPage } from "./features/practice/SessionDetailPage";
 import { api } from "./lib/api";
+import "./App.css";
 
 type AppRoute = "profile" | "library" | "practice" | "test" | "results" | "admin" | "profile-edit" | "session-detail";
 
@@ -216,10 +217,6 @@ export function App() {
           </div>
         </div>
       )}
-      <style>{`
-        .app-wrap { min-height:100vh; display:flex; flex-direction:column; background:var(--bg); }
-        .page-body { flex:1; }
-      `}</style>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { PlusIcon, TrashIcon, XIcon, EditIcon, UsersIcon, BookOpenIcon, CheckIcon, LayersIcon } from "../../../components/ui";
 import { api } from "../../../lib/api";
+import "./AdminCourses.css";
 
 export function AdminCourses() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -34,11 +35,6 @@ export function AdminCourses() {
 
       {createOpen && <CreateCourseModal onClose={() => setCreateOpen(false)} />}
 
-      <style>{`
-        .courses-layout { display:grid; grid-template-columns:300px 1fr; gap:16px; align-items:start; }
-        .courses-empty-panel { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:260px; color:var(--ink-3); }
-        @media(max-width:700px) { .courses-layout { grid-template-columns:1fr; } }
-      `}</style>
     </div>
   );
 }

@@ -1,0 +1,3 @@
+
+        .sd-header { display:flex; align-items:flex-start; gap:20px; padding:24px; margin-bottom:16px; }
+        @media(max-width:520px) { .sd-header{flex-direction:column} }

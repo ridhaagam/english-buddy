@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { ArrowRightIcon, ImportIcon, CheckIcon } from "../../../components/ui";
 import { api } from "../../../lib/api";
+import "./AdminImport.css";
 
 export function AdminImport() {
   const [step, setStep] = useState<"upload" | "preview" | "done">("upload");
@@ -172,19 +173,6 @@ export function AdminImport() {
         </div>
       )}
 
-      <style>{`
-        .adm-page { padding-top: 28px; }
-        .steps-bar { display:flex; align-items:center; margin-bottom:24px; gap:0; }
-        .step { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ink-3); }
-        .step.done { color:var(--accent-ink); }
-        .step-dot { width:24px;height:24px; border-radius:50%; border:1.5px solid var(--line); display:grid; place-items:center; font-size:11px; background:var(--bg); flex-shrink:0; }
-        .step.done .step-dot { background:var(--accent-soft); border-color:var(--accent); color:var(--accent-ink); }
-        .step-line { width:40px; height:1px; background:var(--line); margin:0 8px; }
-        .imp-card { padding:28px; }
-        .drop-zone { border:2px dashed var(--line); border-radius:var(--r-lg); padding:48px 24px; text-align:center; cursor:pointer; transition:border-color 0.15s,background 0.15s; color:var(--ink-2); display:flex; flex-direction:column; align-items:center; }
-        .drop-zone:hover, .drop-zone.drag { border-color:var(--accent); background:var(--accent-soft); color:var(--accent-ink); }
-        .prev-q { background:var(--bg-2); border:1px solid var(--line); border-radius:var(--r-md); padding:12px 14px; }
-      `}</style>
     </div>
   );
 }

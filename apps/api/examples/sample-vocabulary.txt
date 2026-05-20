@@ -1,0 +1,178 @@
+Sample Vocabulary List — Daily English for Beginners
+======================================================
+Use this file as a reference for how to structure a vocabulary import.
+Drop a PDF or Word (.docx) version of this format into Admin → Import Document.
+
+FORMAT: Each word or phrase on its own line, followed by its definition.
+Blank lines between entries are fine. The AI parser extracts the word–definition
+pairs and auto-generates multiple-choice and match-style questions.
+
+──────────────────────────────────────────────────────
+GREETINGS & INTRODUCTIONS
+──────────────────────────────────────────────────────
+
+Hello
+A common English greeting used when meeting someone.
+
+Good morning
+A greeting used in the morning, before noon.
+
+Good afternoon
+A greeting used after noon and before evening.
+
+Good evening
+A greeting used in the evening or at night.
+
+Goodbye
+What you say when leaving someone or ending a conversation.
+
+How are you?
+A polite question asking about someone's wellbeing.
+
+Nice to meet you
+A phrase said when you are introduced to someone for the first time.
+
+My name is ___
+The phrase used to introduce yourself by name.
+
+What is your name?
+A question used to ask for someone's name.
+
+See you later
+An informal phrase meaning "we will meet again soon."
+
+──────────────────────────────────────────────────────
+NUMBERS & TIME
+──────────────────────────────────────────────────────
+
+One, Two, Three
+The first three cardinal numbers in English.
+
+Morning
+The early part of the day, from sunrise to noon.
+
+Afternoon
+The part of the day from noon to evening.
+
+Evening
+The part of the day from late afternoon to night.
+
+Today
+The current day; this present day.
+
+Tomorrow
+The day after today.
+
+Yesterday
+The day before today.
+
+Week
+A period of seven days.
+
+Month
+A period of approximately 30 days; one of the 12 divisions of a year.
+
+Year
+A period of 365 days (or 366 in a leap year).
+
+──────────────────────────────────────────────────────
+FOOD & DRINK
+──────────────────────────────────────────────────────
+
+Breakfast
+The first meal of the day, eaten in the morning.
+
+Lunch
+The meal eaten in the middle of the day.
+
+Dinner
+The main meal of the day, usually eaten in the evening.
+
+Water
+A clear, tasteless liquid that is essential for life.
+
+Coffee
+A hot drink made from roasted coffee beans.
+
+Tea
+A hot drink made by pouring boiling water over dried tea leaves.
+
+Rice
+A common grain food eaten as a staple in many countries.
+
+Bread
+A food made from flour, water, and yeast, baked in an oven.
+
+Fruit
+The sweet or sour edible part of a plant (e.g., apple, mango, banana).
+
+Vegetables
+Edible plants or parts of plants, such as carrots, tomatoes, and spinach.
+
+──────────────────────────────────────────────────────
+PLACES & DIRECTIONS
+──────────────────────────────────────────────────────
+
+School
+A place where students go to learn.
+
+Hospital
+A building where doctors and nurses care for sick or injured people.
+
+Market
+A place where people buy and sell goods.
+
+Bank
+A place where people keep money and carry out financial transactions.
+
+Left
+The direction opposite to right; the side of the heart.
+
+Right
+The direction opposite to left.
+
+Straight
+Going directly ahead without turning.
+
+Near
+Close in distance; not far away.
+
+Far
+A long distance away; not near.
+
+Turn
+To change direction, usually at a corner or junction.
+
+──────────────────────────────────────────────────────
+COMMON VERBS
+──────────────────────────────────────────────────────
+
+Eat
+To put food in the mouth, chew, and swallow it.
+
+Drink
+To take liquid into the mouth and swallow it.
+
+Go
+To move or travel from one place to another.
+
+Come
+To move toward a person or place.
+
+See
+To perceive something with the eyes.
+
+Hear
+To perceive sound with the ears.
+
+Speak
+To use the voice to say words; to talk.
+
+Listen
+To give attention to a sound; to make an effort to hear.
+
+Read
+To look at and understand written words or symbols.
+
+Write
+To form letters or words on a surface with a pen, pencil, or keyboard.

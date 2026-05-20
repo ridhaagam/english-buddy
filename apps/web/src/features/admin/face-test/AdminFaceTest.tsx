@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import "./AdminFaceTest.css";
 
 type DetResult = { faceCount: number; gazeOk: boolean | null; backend: string; fps: number };
 
@@ -299,10 +300,6 @@ export function AdminFaceTest() {
         )}
       </div>
 
-      <style>{`
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-        .adm-page { padding-top: 28px; }
-      `}</style>
     </div>
   );
 }

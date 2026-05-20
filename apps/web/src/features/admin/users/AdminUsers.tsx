@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { PlusIcon, TrashIcon, XIcon, ArrowRightIcon } from "../../../components/ui";
 import { api } from "../../../lib/api";
+import "./AdminUsers.css";
 
 const STAFF_ROLES = ["editor", "admin", "owner"];
 
@@ -128,11 +129,6 @@ function StaffTab() {
         </div>
       )}
 
-      <style>{`
-        .adm-page { padding-top: 28px; }
-        .modal-overlay { position:fixed; inset:0; background:oklch(0 0 0/0.4); z-index:100; display:grid; place-items:center; padding:20px; }
-        .modal-card { background:var(--bg); border-radius:var(--r-xl); padding:28px 28px 24px; width:min(440px,96vw); box-shadow:var(--shadow-lg); border:1px solid var(--line); }
-      `}</style>
     </>
   );
 }

@@ -5,6 +5,7 @@ import {
   ZapIcon, TrophyIcon,
 } from "../../components/ui";
 import { api } from "../../lib/api";
+import "./ProfileEditPage.css";
 
 type Props = {
   user: any;
@@ -262,71 +263,6 @@ export function ProfileEditPage({ user, onBack, onUserUpdate }: Props) {
 
       {pwOpen && <PasswordModal onClose={() => setPwOpen(false)} />}
 
-      <style>{`
-        .pe-wrap { padding-top:24px; padding-bottom:56px; }
-
-        /* Top bar */
-        .pe-topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; }
-
-        /* Hero card */
-        .pe-hero { display:grid; grid-template-columns:auto 1fr auto; gap:28px; align-items:start; padding:28px 32px; margin-bottom:20px; }
-        .pe-hero-left { display:flex; flex-direction:column; align-items:center; gap:12px; min-width:120px; }
-        .pe-hero-name { text-align:center; }
-        .pe-hero-name h2 { margin:0 0 2px; font-size:22px; letter-spacing:-0.02em; }
-        .pe-hero-mid { padding-left:8px; border-left:2px solid var(--line-2); }
-        .pe-hero-right { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-        .pe-stat-tile { display:flex; align-items:center; gap:10px; background:var(--bg-2); border:1px solid var(--line); border-radius:var(--r-md); padding:12px 14px; min-width:120px; }
-        .pe-stat-icon { width:36px;height:36px; border-radius:9px; display:grid; place-items:center; background:oklch(0.94 0.05 var(--h));color:oklch(0.38 0.1 var(--h)); flex-shrink:0; }
-        .pe-stat-tile strong { display:block; font-size:18px; font-weight:700; letter-spacing:-0.01em; }
-        .pe-stat-tile span { font-size:11px; color:var(--ink-3); }
-
-        /* Avatar */
-        .pe-avatar-ring { position:relative; cursor:pointer; border-radius:50%; display:inline-block; }
-        .pe-avatar-overlay { position:absolute; inset:0; border-radius:50%; background:oklch(0 0 0/0.38); display:grid; place-items:center; color:white; opacity:0; transition:opacity 0.2s; }
-        .pe-avatar-ring:hover .pe-avatar-overlay { opacity:1; }
-
-        /* Body layout */
-        .pe-body { display:grid; grid-template-columns:1fr 1.4fr; gap:20px; align-items:start; }
-        .pe-col-form { display:flex; flex-direction:column; }
-        .pe-col-ach { }
-        .pe-card { padding:26px 28px; }
-        .pe-section-title { margin:0 0 18px; font-size:20px; letter-spacing:-0.01em; }
-
-        /* Form */
-        .pe-form-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
-
-        /* Achievement grid */
-        .pe-ach-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:9px; }
-        .pe-ach-card { background:var(--bg-2); border:1px solid var(--line); border-radius:var(--r-md); padding:11px 12px; display:flex; align-items:center; gap:10px; opacity:0.45; animation:fadeUp 0.4s ease both; transition:opacity 0.2s,border-color 0.2s; }
-        .pe-ach-card.earned { opacity:1; border-color:color-mix(in oklch,var(--accent),white 55%); }
-        .pe-ach-glyph { width:32px;height:32px; border-radius:8px; background:var(--bg); display:grid; place-items:center; color:var(--ink-3); flex-shrink:0; border:1px solid var(--line-2); }
-        .pe-ach-card.earned .pe-ach-glyph { background:var(--accent-soft); color:var(--accent-ink); border-color:transparent; }
-        .pe-ach-body { display:flex; flex-direction:column; gap:1px; min-width:0; flex:1; }
-        .pe-ach-body strong { font-size:12px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-        .pe-ach-body span { font-size:11px; color:var(--ink-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-        .pe-prog { height:3px; background:var(--line-2); border-radius:999px; overflow:hidden; margin-top:5px; }
-        .pe-prog span { display:block; height:100%; background:var(--accent); border-radius:999px; }
-        .pe-ach-tick { width:20px;height:20px; border-radius:50%; background:var(--accent); color:white; display:grid; place-items:center; flex-shrink:0; }
-
-        /* Responsive */
-        @media(max-width:1060px) { .pe-body{grid-template-columns:1fr} }
-        @media(max-width:820px) {
-          .pe-hero{grid-template-columns:1fr;gap:16px}
-          .pe-hero-left{flex-direction:row;align-items:center;gap:18px;min-width:unset}
-          .pe-hero-name{text-align:left}
-          .pe-hero-mid{border-left:none;border-top:1px solid var(--line-2);padding-left:0;padding-top:12px}
-          .pe-hero-right{grid-template-columns:1fr 1fr}
-        }
-        @media(max-width:520px) {
-          .pe-form-grid{grid-template-columns:1fr}
-          .pe-hero-right{grid-template-columns:1fr 1fr}
-          .pe-card{padding:18px 16px}
-        }
-
-        /* Password modal */
-        .pw-overlay { position:fixed;inset:0;background:oklch(0 0 0/0.48);z-index:400;display:grid;place-items:center;padding:20px; }
-        .pw-box { background:var(--bg);border-radius:var(--r-xl);padding:30px;width:min(420px,96vw);box-shadow:var(--shadow-lg);border:1px solid var(--line); }
-      `}</style>
     </div>
   );
 }

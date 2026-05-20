@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeftIcon, CheckIcon, XIcon, ClockIcon, FlagIcon, ArrowRightIcon } from "../../components/ui";
 import { api } from "../../lib/api";
+import "./SessionDetailPage.css";
 
 type Props = {
   sessionId: string;
@@ -253,10 +254,6 @@ export function SessionDetailPage({ sessionId, onBack, onPracticeAgain }: Props)
         })}
       </div>
 
-      <style>{`
-        .sd-header { display:flex; align-items:flex-start; gap:20px; padding:24px; margin-bottom:16px; }
-        @media(max-width:520px) { .sd-header{flex-direction:column} }
-      `}</style>
     </div>
   );
 }

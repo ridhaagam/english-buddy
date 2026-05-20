@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../../lib/api";
+import "./AdminAuditLog.css";
 
 const ACTION_COLOR: Record<string, string> = {
   publish_module: "158",
@@ -101,7 +102,6 @@ export function AdminAuditLog() {
         </div>
       )}
 
-      <style>{`.adm-page { padding-top: 28px; }`}</style>
     </div>
   );
 }

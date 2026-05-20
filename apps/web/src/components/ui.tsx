@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect, useRef } from "react";
 // Re-exported for convenience
 export type { FC } from "react";
+import "./ui.css";
 
 // ----- Logo -----------------------------------------------------------------
 export function Logo({ size = 22 }: { size?: number; mark?: number }) {
@@ -288,7 +289,6 @@ export function Spinner({ size = 20 }: { size?: number }) {
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
       strokeWidth="2" strokeLinecap="round" aria-label="Loading"
       style={{ animation: "spin 0.8s linear infinite" }}>
-      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
       <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
     </svg>
   );

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../../lib/api";
+import "./AdminReports.css";
 
 export function AdminReports() {
   const { data: kpi } = useQuery({ queryKey: ["admin-reports-kpi"], queryFn: api.admin.reports.kpi });
@@ -80,21 +81,6 @@ export function AdminReports() {
         </div>
       </div>
 
-      <style>{`
-        .adm-page { padding-top: 28px; }
-        .rep-kpi-strip { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px; }
-        .rep-kpi { padding:16px 18px; display:flex; flex-direction:column; gap:4px; }
-        .rep-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:16px; }
-        .rep-panel { padding:22px 24px; }
-        .bar-chart { display:flex; align-items:flex-end; gap:6px; height:160px; padding-bottom:22px; position:relative; }
-        .bar-col { display:flex; flex-direction:column; align-items:center; flex:1; height:100%; justify-content:flex-end; position:relative; }
-        .bar-bar { width:100%; border-radius:4px 4px 0 0; min-height:2px; transition:height 0.6s cubic-bezier(0.22,1,0.36,1); }
-        .bar-label { position:absolute; bottom:-18px; font-size:9px; color:var(--ink-3); white-space:nowrap; }
-        .topic-row { display:flex; align-items:center; gap:10px; }
-        .topic-track { flex:1; height:8px; background:var(--bg-2); border-radius:999px; overflow:hidden; }
-        .topic-fill { height:100%; border-radius:999px; transition:width 0.8s cubic-bezier(0.22,1,0.36,1); }
-        @media(max-width:900px) { .rep-kpi-strip{grid-template-columns:repeat(2,1fr)} .rep-grid{grid-template-columns:1fr} }
-      `}</style>
     </div>
   );
 }

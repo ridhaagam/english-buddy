@@ -2,6 +2,7 @@ import { useState, Fragment, useRef, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { PlusIcon, EditIcon, TrashIcon, XIcon, ArrowRightIcon, UsersIcon, CheckIcon } from "../../../components/ui";
 import { api } from "../../../lib/api";
+import "./AdminModules.css";
 
 const TOPICS = ["vocabulary", "grammar", "listening", "speaking", "writing"];
 const CEFR = ["A1", "A2", "B1", "B2", "C1", "C2"];
@@ -410,39 +411,6 @@ export function AdminModules() {
         <AssignLearnersModal moduleId={assignModuleId} onClose={() => setAssignModuleId(null)} />
       )}
 
-      <style>{`
-        .adm-page { padding-top: 28px; }
-        .mod-toast { position:fixed; bottom:28px; right:28px; z-index:9999; padding:12px 20px; border-radius:var(--r-md); font-size:14px; font-weight:600; font-family:var(--font-ui); box-shadow:0 4px 24px oklch(0 0 0/0.14); animation:toastIn 0.22s cubic-bezier(0.22,1,0.36,1); pointer-events:none; }
-        .mod-toast.ok { background:oklch(0.48 0.13 158); color:#fff; }
-        .mod-toast.err { background:oklch(0.5 0.15 25); color:#fff; }
-        @keyframes toastIn { from { opacity:0; transform:translateY(12px) scale(0.96); } to { opacity:1; transform:translateY(0) scale(1); } }
-        .drawer-overlay { position:fixed; inset:0; background:oklch(0 0 0/0.45); z-index:100; display:flex; justify-content:flex-end; backdrop-filter:blur(2px); }
-        .drawer { background:var(--bg); width:min(960px,96vw); height:100%; display:flex; flex-direction:column; overflow:hidden; box-shadow:var(--shadow-lg); }
-        .drawer-head { display:flex; justify-content:space-between; align-items:center; padding:20px 24px; border-bottom:1px solid var(--line); background:var(--surface); flex-shrink:0; }
-        .drawer-body { flex:1; overflow-y:auto; padding:22px 28px; }
-        .drawer-foot { padding:16px 24px; border-top:1px solid var(--line); display:flex; justify-content:flex-end; gap:10px; background:var(--surface); flex-shrink:0; }
-        .drawer-cols { display:grid; grid-template-columns:340px 1fr; gap:28px; }
-        .drawer-left { display:flex; flex-direction:column; gap:14px; min-width:0; }
-        .drawer-right { display:flex; flex-direction:column; gap:12px; padding-left:28px; border-left:1px solid var(--line); min-width:0; }
-        .q-list { display:flex; flex-direction:column; gap:4px; max-height:min(440px,50vh); overflow-y:auto; }
-        .q-item { display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:var(--r-sm); border:1px solid var(--line); cursor:pointer; transition:border-color 0.15s,background 0.15s; }
-        .q-item:hover { border-color:var(--ink-3); }
-        .q-item.active { border-color:var(--accent); background:var(--accent-soft); }
-        .del-confirm { display:flex; align-items:center; gap:12px; padding:10px 16px; background:oklch(0.97 0.02 25); font-size:13px; }
-        @media(max-width:900px) {
-          .drawer { width:min(680px,96vw); }
-          .drawer-cols { grid-template-columns:1fr; }
-          .drawer-right { border-left:none; border-top:1px solid var(--line); padding-left:0; padding-top:18px; }
-          .q-list { max-height:min(300px,38vh); }
-        }
-        @media(max-width:640px) {
-          .drawer { width:100vw; }
-          .drawer-body { padding:14px 16px; }
-          .drawer-head { padding:16px; }
-          .drawer-foot { padding:12px 16px; }
-          .q-list { max-height:min(220px,32vh); }
-        }
-      `}</style>
     </div>
   );
 }

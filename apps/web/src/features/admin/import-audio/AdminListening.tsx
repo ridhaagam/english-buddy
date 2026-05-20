@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { ArrowRightIcon, MicIcon, CheckIcon } from "../../../components/ui";
 import { api } from "../../../lib/api";
+import "./AdminListening.css";
 
 export function AdminListening() {
   const [step, setStep] = useState<"upload" | "preview" | "done">("upload");
@@ -173,13 +174,6 @@ export function AdminListening() {
         </div>
       )}
 
-      <style>{`
-        .adm-page { padding-top: 28px; }
-        .imp-card { padding:28px; }
-        .drop-zone { border:2px dashed var(--line); border-radius:var(--r-lg); padding:48px 24px; text-align:center; cursor:pointer; transition:border-color 0.15s,background 0.15s; color:var(--ink-2); display:flex; flex-direction:column; align-items:center; }
-        .drop-zone:hover, .drop-zone.drag { border-color:var(--accent); background:var(--accent-soft); color:var(--accent-ink); }
-        .prev-q { background:var(--bg-2); border:1px solid var(--line); border-radius:var(--r-md); padding:12px 14px; }
-      `}</style>
     </div>
   );
 }
