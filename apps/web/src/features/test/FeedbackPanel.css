@@ -1,0 +1,272 @@
+/* ─── FeedbackPanel — Interactive Coaching Card ────────────────────────────────
+   Verdict → Language toggle → Per-choice expandable cards
+   ──────────────────────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700;9..144,900&family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
+
+/* ── Overlay ── */
+.fp-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  background: rgba(0, 0, 0, 0);
+  transition: background 0.3s ease;
+  pointer-events: none;
+}
+.fp-visible {
+  background: rgba(0, 0, 0, 0.46);
+  pointer-events: all;
+}
+
+/* ── Sheet ── */
+.fp-sheet {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  border-radius: 22px 22px 0 0;
+  padding: 10px 18px max(34px, env(safe-area-inset-bottom, 34px));
+  transform: translateY(100%);
+  transition: transform 0.44s cubic-bezier(0.34, 1.44, 0.64, 1);
+  will-change: transform;
+  max-height: 90dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.fp-sheet-in { transform: translateY(0); }
+
+.fp-correct {
+  background: linear-gradient(160deg, oklch(0.96 0.07 142) 0%, #fff 55%);
+  border-top: 3.5px solid oklch(0.50 0.2 142);
+}
+.fp-wrong {
+  background: linear-gradient(160deg, oklch(0.96 0.06 25) 0%, #fff 55%);
+  border-top: 3.5px solid oklch(0.54 0.2 25);
+}
+
+/* ── Handle ── */
+.fp-handle {
+  width: 38px; height: 4px;
+  border-radius: 2px;
+  margin: 6px auto 16px;
+}
+.fp-correct .fp-handle { background: oklch(0.65 0.1 142); }
+.fp-wrong   .fp-handle { background: oklch(0.68 0.1 25); }
+
+/* ── Verdict ── */
+.fp-verdict {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.fp-verdict-icon {
+  width: 48px; height: 48px;
+  border-radius: 15px;
+  display: grid; place-items: center;
+  font-size: 22px; font-weight: 900;
+  flex-shrink: 0;
+  animation: fp-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.fp-correct .fp-verdict-icon {
+  background: oklch(0.50 0.2 142); color: white;
+  box-shadow: 0 5px 16px oklch(0.50 0.2 142 / 0.35);
+}
+.fp-wrong .fp-verdict-icon {
+  background: oklch(0.54 0.2 25); color: white;
+  box-shadow: 0 5px 16px oklch(0.54 0.2 25 / 0.35);
+}
+.fp-verdict-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.fp-verdict-word {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 32px; font-weight: 900; line-height: 1;
+  letter-spacing: -0.025em;
+  animation: fp-slide-r 0.38s cubic-bezier(0.22, 1, 0.36, 1) 0.05s both;
+}
+.fp-correct .fp-verdict-word { color: oklch(0.28 0.18 142); }
+.fp-wrong   .fp-verdict-word { color: oklch(0.35 0.18 25); }
+.fp-verdict-sub {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 12px; font-weight: 500;
+  color: var(--ink-3, #888);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  animation: fp-slide-r 0.38s cubic-bezier(0.22, 1, 0.36, 1) 0.1s both;
+}
+.fp-xp-badge {
+  padding: 5px 12px; border-radius: 999px;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 12px; font-weight: 700; letter-spacing: 0.03em;
+  background: oklch(0.50 0.2 142); color: white;
+  box-shadow: 0 3px 10px oklch(0.50 0.2 142 / 0.3);
+  animation: fp-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.2s both;
+  flex-shrink: 0;
+}
+
+/* ── Language toggle ── */
+.fp-lang-toggle {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+  animation: fp-slide-u 0.35s ease 0.1s both;
+}
+.fp-lang-btn {
+  flex: 1;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1.5px solid var(--line, #e0e0e0);
+  background: transparent;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 12px; font-weight: 600;
+  cursor: pointer;
+  color: var(--ink-2, #666);
+  transition: all 0.16s;
+}
+.fp-lang-btn.active {
+  border-color: transparent;
+  color: var(--ink, #161616);
+  background: white;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.12);
+}
+.fp-correct .fp-lang-btn.active { box-shadow: 0 2px 8px oklch(0.50 0.2 142 / 0.2); }
+.fp-wrong   .fp-lang-btn.active { box-shadow: 0 2px 8px oklch(0.54 0.2 25  / 0.2); }
+
+/* ── Choice card list ── */
+.fp-choice-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-bottom: 16px;
+  animation: fp-slide-u 0.38s ease 0.15s both;
+}
+
+/* ── Single choice card ── */
+.fp-cc {
+  border-radius: 13px;
+  overflow: hidden;
+  border: 1.5px solid var(--line, #e8e8e8);
+  background: white;
+  transition: border-color 0.18s;
+}
+.fp-cc[role="button"] { cursor: pointer; }
+.fp-cc[role="button"]:active { transform: scale(0.99); }
+
+/* Status colour variants */
+.fp-cc-correct {
+  border-color: oklch(0.78 0.1 142);
+  background: oklch(0.97 0.04 142);
+}
+.fp-cc-wrong {
+  border-color: oklch(0.84 0.08 25);
+  background: oklch(0.97 0.03 25);
+}
+.fp-cc-neutral {
+  border-color: var(--line, #e0e0e0);
+  background: white;
+}
+.fp-cc-neutral.fp-cc-open {
+  border-color: oklch(0.72 0.08 262);
+  background: oklch(0.975 0.015 262);
+}
+
+/* Card header row */
+.fp-cc-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  min-height: 48px;
+}
+.fp-cc-letter {
+  width: 28px; height: 28px;
+  border-radius: 8px;
+  display: grid; place-items: center;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 12px; font-weight: 700;
+  flex-shrink: 0;
+}
+.fp-cc-correct .fp-cc-letter { background: oklch(0.50 0.2 142); color: white; }
+.fp-cc-wrong   .fp-cc-letter { background: oklch(0.54 0.2 25);  color: white; }
+.fp-cc-neutral .fp-cc-letter { background: var(--bg-2, #f4f4f4); color: var(--ink-2, #666); }
+
+.fp-cc-label {
+  flex: 1;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 14px; font-weight: 500; line-height: 1.35;
+  color: var(--ink, #161616);
+}
+.fp-cc-mark {
+  font-size: 15px; font-weight: 800; flex-shrink: 0; width: 20px; text-align: center;
+  transition: transform 0.22s;
+}
+.fp-cc-correct .fp-cc-mark { color: oklch(0.50 0.2 142); }
+.fp-cc-wrong   .fp-cc-mark { color: oklch(0.54 0.2 25); }
+.fp-cc-neutral .fp-cc-mark { color: var(--ink-3, #aaa); font-size: 14px; }
+.fp-cc-neutral.fp-cc-open .fp-cc-mark { transform: rotate(90deg); color: oklch(0.5 0.1 262); }
+
+/* Card body (explanation) */
+.fp-cc-body {
+  border-top: 1px solid;
+  padding: 0 14px;
+  transition: max-height 0.3s ease, padding 0.3s ease;
+}
+.fp-cc:not(.fp-cc-open) .fp-cc-body { padding-top: 0; padding-bottom: 0; border-top-color: transparent; }
+.fp-cc.fp-cc-open .fp-cc-body { padding-top: 10px; padding-bottom: 14px; }
+
+.fp-cc-correct .fp-cc-body { border-top-color: oklch(0.85 0.08 142); }
+.fp-cc-wrong   .fp-cc-body { border-top-color: oklch(0.88 0.06 25); }
+.fp-cc-neutral.fp-cc-open .fp-cc-body { border-top-color: oklch(0.88 0.04 262); }
+
+.fp-cc-text {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 13px; font-weight: 400; line-height: 1.6;
+  color: var(--ink-2, #444);
+  margin: 0;
+}
+.fp-cc-correct .fp-cc-text { color: oklch(0.3 0.12 142); }
+.fp-cc-wrong   .fp-cc-text { color: oklch(0.35 0.12 25); }
+.fp-cc-neutral.fp-cc-open .fp-cc-text { color: oklch(0.35 0.1 262); }
+
+/* ── CTA ── */
+.fp-cta {
+  display: flex; align-items: center; justify-content: center;
+  gap: 8px; width: 100%;
+  padding: 15px; border-radius: 13px; border: none;
+  cursor: pointer;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 16px; font-weight: 700; letter-spacing: 0.01em;
+  transition: opacity 0.15s, transform 0.12s;
+  animation: fp-slide-u 0.38s ease 0.22s both;
+}
+.fp-cta:hover:not(:disabled) { opacity: 0.9; }
+.fp-cta:active:not(:disabled) { transform: scale(0.975); }
+.fp-cta:disabled { opacity: 0.55; cursor: not-allowed; }
+.fp-correct .fp-cta { background: oklch(0.50 0.2 142); color: white; box-shadow: 0 5px 18px oklch(0.50 0.2 142 / 0.28); }
+.fp-wrong   .fp-cta { background: oklch(0.54 0.2 25);  color: white; box-shadow: 0 5px 18px oklch(0.54 0.2 25  / 0.28); }
+
+/* ── Keyframes ── */
+@keyframes fp-pop {
+  from { transform: scale(0.55); opacity: 0; }
+  to   { transform: scale(1);    opacity: 1; }
+}
+@keyframes fp-slide-r {
+  from { transform: translateX(-10px); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+@keyframes fp-slide-u {
+  from { transform: translateY(10px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+/* ── Desktop centering ── */
+@media (min-width: 640px) {
+  .fp-sheet {
+    max-width: 480px;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%) translateY(100%);
+    border-radius: 20px 20px 0 0;
+  }
+  .fp-sheet.fp-sheet-in {
+    transform: translateX(-50%) translateY(0);
+  }
+}

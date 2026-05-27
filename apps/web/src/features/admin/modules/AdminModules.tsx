@@ -13,14 +13,15 @@ type ModuleForm = {
   source_kind: string; status: string; questions: Q[];
 };
 type Settings = {
-  deadline: string; is_closed: boolean; max_attempts: string; show_answers_after_deadline: boolean; reveal_at: string;
+  deadline: string; is_closed: boolean; max_attempts: string; show_answers_after_deadline: boolean; reveal_at: string; show_live_feedback: boolean;
+  is_exam: boolean; exam_duration_minutes: string;
 };
 
 const blank: ModuleForm = {
   title: "", topic: "vocabulary", cefr_level: "B1", description: "",
   source_kind: "manual", status: "draft", questions: [],
 };
-const blankSettings: Settings = { deadline: "", is_closed: false, max_attempts: "", show_answers_after_deadline: false, reveal_at: "" };
+const blankSettings: Settings = { deadline: "", is_closed: false, max_attempts: "", show_answers_after_deadline: false, reveal_at: "", show_live_feedback: false, is_exam: false, exam_duration_minutes: "" };
 const blankQ: Q = { kind: "choice", prompt: "", context: null, sentence: null, explain: null, payload: { choices: [], answer: "" } };
 
 export function AdminModules() {
@@ -64,6 +65,9 @@ export function AdminModules() {
       max_attempts: m.max_attempts != null ? String(m.max_attempts) : "",
       show_answers_after_deadline: m.show_answers_after_deadline !== false,
       reveal_at: m.reveal_at ? m.reveal_at.slice(0, 16) : "",
+      show_live_feedback: m.show_live_feedback || false,
+      is_exam: m.is_exam || false,
+      exam_duration_minutes: m.exam_duration_minutes != null ? String(m.exam_duration_minutes) : "",
     });
     setQIdx(null);
     setOpen(true);
@@ -94,6 +98,9 @@ export function AdminModules() {
         max_attempts: detail.max_attempts != null ? String(detail.max_attempts) : "",
         show_answers_after_deadline: detail.show_answers_after_deadline !== false,
         reveal_at: detail.reveal_at ? detail.reveal_at.slice(0, 16) : "",
+        show_live_feedback: detail.show_live_feedback || false,
+        is_exam: detail.is_exam || false,
+        exam_duration_minutes: detail.exam_duration_minutes != null ? String(detail.exam_duration_minutes) : "",
       });
     } catch (err: any) {
       showToast("Failed to load module: " + (err.message || "unknown error"), false);
@@ -133,6 +140,12 @@ export function AdminModules() {
           is_closed: settings.is_closed,
           max_attempts: settings.max_attempts !== "" ? Number(settings.max_attempts) : null,
           show_answers_after_deadline: settings.show_answers_after_deadline,
+          show_live_feedback: settings.show_live_feedback,
+          is_exam: settings.is_exam,
+          exam_duration_minutes: (() => {
+            const v = parseInt(settings.exam_duration_minutes.trim(), 10);
+            return !isNaN(v) && v > 0 ? v : null;
+          })(),
         });
       }
       qc.invalidateQueries({ queryKey: ["admin-modules"] });
@@ -222,7 +235,10 @@ export function AdminModules() {
                           Max {m.max_attempts}
                         </span>
                       )}
-                      {!m.is_closed && !m.deadline && !m.max_attempts && (
+                      {m.is_exam && (
+                        <span className="mono" style={{ fontSize: 10, padding: "2px 6px", borderRadius: 999, background: "oklch(0.93 0.08 55)", color: "oklch(0.45 0.12 55)", border: "1px solid oklch(0.85 0.08 55)" }}>EXAM</span>
+                      )}
+                      {!m.is_closed && !m.deadline && !m.max_attempts && !m.is_exam && (
                         <span style={{ color: "var(--ink-3)", fontSize: 12 }}>Open</span>
                       )}
                     </div>
@@ -346,7 +362,26 @@ export function AdminModules() {
                           onChange={(e) => setS("show_answers_after_deadline", e.target.checked)} />
                         Reveal answers to learners
                       </label>
+                      <label style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13, cursor: "pointer" }}>
+                        <input type="checkbox" checked={settings.show_live_feedback}
+                          onChange={(e) => setS("show_live_feedback", e.target.checked)} />
+                        Show live feedback (benar/salah after each answer)
+                      </label>
+                      <label style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13, cursor: "pointer" }}>
+                        <input type="checkbox" checked={settings.is_exam}
+                          onChange={(e) => setS("is_exam", e.target.checked)} />
+                        Exam mode (shown in Exam Corner, results hidden until reveal date)
+                      </label>
                     </div>
+                    {settings.is_exam && (
+                      <div className="field" style={{ marginTop: 10, maxWidth: 200 }}>
+                        <label>Exam duration (minutes)</label>
+                        <input type="number" min="1" value={settings.exam_duration_minutes}
+                          onChange={(e) => setS("exam_duration_minutes", e.target.value)}
+                          placeholder="No limit" />
+                        <span style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 3 }}>Auto-submits when time runs out. Leave blank for unlimited.</span>
+                      </div>
+                    )}
                   </div>
 
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4, paddingTop: 4, borderTop: "1px solid var(--line-2)" }}>
@@ -373,24 +408,33 @@ export function AdminModules() {
                       <label>Type</label>
                       <select value={curQ.kind} onChange={(e) => {
                         const kind = e.target.value;
-                        const payload = kind === "match" ? { pairs: [] } : kind === "fill" ? { sentence: curQ.sentence || "", choices: [], answer: "" } : { choices: [], answer: "" };
+                        let payload: any;
+                        if (kind === "match") payload = { pairs: [] };
+                        else if (kind === "fill") payload = { sentence: curQ.sentence || "", choices: [], answer: "" };
+                        else if (kind === "dictation") payload = { answer: "" };
+                        else payload = { choices: [], answer: "" };
                         setQ(qIdx, "kind", kind);
                         setQPayload(qIdx, payload);
                       }}>
                         <option value="choice">Multiple choice</option>
                         <option value="fill">Fill in blank</option>
                         <option value="match">Match pairs</option>
+                        <option value="listen_choice">Listen &amp; choose</option>
+                        <option value="dictation">Dictation (listen &amp; type)</option>
                       </select>
                     </div>
                     <div className="field">
                       <label>Prompt</label>
                       <input value={curQ.prompt} onChange={(e) => setQ(qIdx, "prompt", e.target.value)} placeholder="Question prompt" />
                     </div>
-                    {(curQ.kind === "choice" || curQ.kind === "fill") && (
+                    {(curQ.kind === "choice" || curQ.kind === "fill" || curQ.kind === "listen_choice") && (
                       <QuestionChoiceEditor q={curQ} onChange={(p) => setQPayload(qIdx, p)} />
                     )}
                     {curQ.kind === "match" && (
                       <QuestionMatchEditor q={curQ} onChange={(p) => setQPayload(qIdx, p)} />
+                    )}
+                    {curQ.kind === "dictation" && (
+                      <QuestionDictationEditor q={curQ} onChange={(p) => setQPayload(qIdx, p)} />
                     )}
                   </div>
                 )}
@@ -463,6 +507,22 @@ function QuestionMatchEditor({ q, onChange }: { q: Q; onChange: (p: any) => void
         </div>
       ))}
       <button className="btn ghost sm" style={{ marginTop: 4 }} onClick={() => onChange({ ...q.payload, pairs: [...pairs, { left: "", right: "" }] })}><PlusIcon size={12} /> Add pair</button>
+    </div>
+  );
+}
+
+function QuestionDictationEditor({ q, onChange }: { q: Q; onChange: (p: any) => void }) {
+  return (
+    <div className="field">
+      <label>Correct answer (exact text student must type)</label>
+      <input
+        value={q.payload?.answer ?? ""}
+        onChange={(e) => onChange({ ...q.payload, answer: e.target.value })}
+        placeholder="Type the sentence students should hear and write"
+      />
+      <span style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 3 }}>
+        Scoring is case-insensitive. The module needs audio uploaded via Listening import.
+      </span>
     </div>
   );
 }

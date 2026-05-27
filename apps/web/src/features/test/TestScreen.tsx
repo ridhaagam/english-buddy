@@ -20,6 +20,7 @@ function getFaceApi(): Promise<any> {
 import { useQuery } from "@tanstack/react-query";
 import { ProgressBar, XIcon, ClockIcon, ArrowRightIcon, CheckIcon } from "../../components/ui";
 import { api } from "../../lib/api";
+import { FeedbackPanel } from "./FeedbackPanel";
 import "./TestScreen.css";
 
 type Props = {
@@ -45,6 +46,7 @@ export function TestScreen({ moduleId, onExit, onDone, resumeData }: Props) {
   const [tabAlert, setTabAlert] = useState(false);
   const [exitDialog, setExitDialog] = useState(false);
   const [finishing, setFinishing] = useState(false);
+  const autoFinishedRef = useRef(false);
   const [revealData, setRevealData] = useState<{
     correctId: string; chosenId: string | null; isCorrect: boolean;
     explain: string | null; choices: Array<{id: string; label: string}>; isLast: boolean;
@@ -130,6 +132,40 @@ export function TestScreen({ moduleId, onExit, onDone, resumeData }: Props) {
     return () => document.removeEventListener("visibilitychange", handler);
   }, [q?.id]);
 
+  // Exam countdown auto-finish
+  const examDurationMs = (module as any)?.is_exam && (module as any)?.exam_duration_minutes
+    ? (module as any).exam_duration_minutes * 60 * 1000
+    : null;
+
+  useEffect(() => {
+    if (!examDurationMs || !sessionId || finishing || autoFinishedRef.current) return;
+    if (elapsed < examDurationMs) return;
+    autoFinishedRef.current = true;
+    setFinishing(true);
+    (async () => {
+      try {
+        await Promise.allSettled(pendingRef.current);
+        if (camRef.current) await camRef.current.stopAndUpload(sessionId).catch(() => {});
+        const result = await api.sessions.finish(sessionId, {
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          tab_switch_count: tabSwitchCount,
+          face_anomaly_count: faceAnomalyCount,
+        });
+        api.sessions.logEvent(sessionId, "close").catch(() => {});
+        onDone({
+          ...result,
+          session_id: sessionId,
+          module_id: moduleId,
+          answers: answersRef.current,
+          timeMs: Date.now() - startRef.current,
+          answers_revealed: (result as any).answers_revealed ?? false,
+        });
+      } catch {
+        onDone({ score_pct: 0, session_id: sessionId, module_id: moduleId, answers: answersRef.current, timeMs: 0 });
+      }
+    })();
+  }, [elapsed, examDurationMs, sessionId, finishing]);
+
   const handleFaceAnomaly = useCallback((questionId: string) => {
     setFaceAnomalyCount((c) => c + 1);
     const updated = {
@@ -175,6 +211,7 @@ export function TestScreen({ moduleId, onExit, onDone, resumeData }: Props) {
     (q.kind === "match" && allMatched) ||
     (q.kind === "fill" && choices.length > 0 && selected !== null) ||
     (q.kind === "fill" && choices.length === 0 && fillInput.trim().length > 0) ||
+    (q.kind === "dictation" && fillInput.trim().length > 0) ||
     ((q.kind === "choice" || q.kind === "listen_choice") && selected !== null);
 
   function resetQ() {
@@ -197,12 +234,47 @@ export function TestScreen({ moduleId, onExit, onDone, resumeData }: Props) {
 
   function buildSelection(): Record<string, string> {
     if (q.kind === "match") return { ...matchPairs };
+    if (q.kind === "dictation") return { text: fillInput.trim() };
     if (q.kind === "fill") return { choice: choices.length > 0 ? selected! : fillInput.trim() };
     return { choice: selected! };
   }
 
+  async function finishSession(lastPayload: any, isCorrect: boolean) {
+    setFinishing(true);
+    try {
+      await Promise.allSettled(pendingRef.current);
+      pendingRef.current = [];
+
+      const res = await api.sessions.answer(sessionId!, lastPayload);
+      const qId = lastPayload.question_id;
+      answersRef.current = answersRef.current.map((a) =>
+        a.questionId === qId ? { ...a, is_correct: res?.is_correct ?? isCorrect } : a
+      );
+
+      if (camRef.current) await camRef.current.stopAndUpload(sessionId!);
+      const result = await api.sessions.finish(sessionId!, {
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        tab_switch_count: tabSwitchCount,
+        face_anomaly_count: faceAnomalyCount,
+      });
+      api.sessions.logEvent(sessionId!, "close").catch(() => {});
+      onDone({
+        ...result,
+        session_id: sessionId,
+        module_id: moduleId,
+        answers: answersRef.current,
+        timeMs: Date.now() - startRef.current,
+        answers_revealed: (result as any).answers_revealed ?? true,
+      });
+    } catch {
+      if (camRef.current) await camRef.current.stopAndUpload(sessionId!).catch(() => {});
+      onDone({ score_pct: 0, session_id: sessionId, module_id: moduleId, answers: answersRef.current, timeMs: 0 });
+    }
+  }
+
   async function submit() {
     if (!sessionId || !q) return;
+    if (autoFinishedRef.current) return;  // exam auto-finish already in flight
 
     const selection = buildSelection();
     const timeMs = Date.now() - qStartRef.current;
@@ -217,7 +289,9 @@ export function TestScreen({ moduleId, onExit, onDone, resumeData }: Props) {
 
     const correctId: string = q.payload?.answer || "";
     const chosenId = (q.kind === "choice" || q.kind === "fill" || q.kind === "listen_choice") ? selected : null;
-    const isCorrect = !!(correctId && chosenId && chosenId === correctId);
+    const isCorrect = q.kind === "dictation"
+      ? fillInput.trim().toLowerCase() === correctId.trim().toLowerCase()
+      : !!(correctId && chosenId && chosenId === correctId);
     const correctLabel = choices.find((c: any) => c.id === correctId)?.label || correctId;
 
     const localAnswer = {
@@ -235,28 +309,49 @@ export function TestScreen({ moduleId, onExit, onDone, resumeData }: Props) {
     answersRef.current = [...answersRef.current, localAnswer];
     setAnswers([...answersRef.current]);
 
-    // Show feedback immediately — API call happens in background
-    setRevealData({
-      correctId,
-      chosenId,
-      isCorrect,
-      explain: q.explain || null,
-      choices: [...choices],
-      isLast: last,
-      lastPayload: answerPayload,
-    });
+    const liveFeedback = (module as any)?.show_live_feedback ?? false;
 
-    if (!last) {
-      const capturedQId = q.id;
-      const p = api.sessions.answer(sessionId, answerPayload)
-        .then((res) => {
-          answersRef.current = answersRef.current.map((a) =>
-            a.questionId === capturedQId ? { ...a, is_correct: res?.is_correct ?? isCorrect } : a
-          );
-          setAnswers([...answersRef.current]);
-        })
-        .catch(() => {});
-      pendingRef.current.push(p);
+    if (liveFeedback) {
+      // Show benar/salah feedback panel — API call fires in background for non-last questions
+      setRevealData({
+        correctId,
+        chosenId,
+        isCorrect,
+        explain: q.explain || null,
+        choices: [...choices],
+        isLast: last,
+        lastPayload: answerPayload,
+      });
+      if (!last) {
+        const capturedQId = q.id;
+        const p = api.sessions.answer(sessionId, answerPayload)
+          .then((res) => {
+            answersRef.current = answersRef.current.map((a) =>
+              a.questionId === capturedQId ? { ...a, is_correct: res?.is_correct ?? isCorrect } : a
+            );
+            setAnswers([...answersRef.current]);
+          })
+          .catch(() => {});
+        pendingRef.current.push(p);
+      }
+    } else {
+      // No reveal — advance immediately or finish
+      if (!last) {
+        const capturedQId = q.id;
+        const p = api.sessions.answer(sessionId, answerPayload)
+          .then((res) => {
+            answersRef.current = answersRef.current.map((a) =>
+              a.questionId === capturedQId ? { ...a, is_correct: res?.is_correct ?? isCorrect } : a
+            );
+            setAnswers([...answersRef.current]);
+          })
+          .catch(() => {});
+        pendingRef.current.push(p);
+        setIdx((i) => i + 1);
+        resetQ();
+      } else {
+        await finishSession(answerPayload, isCorrect);
+      }
     }
   }
 
@@ -266,36 +361,7 @@ export function TestScreen({ moduleId, onExit, onDone, resumeData }: Props) {
     setRevealData(null);
 
     if (rd.isLast) {
-      setFinishing(true);
-      try {
-        await Promise.allSettled(pendingRef.current);
-        pendingRef.current = [];
-
-        const res = await api.sessions.answer(sessionId!, rd.lastPayload);
-        const qId = rd.lastPayload.question_id;
-        answersRef.current = answersRef.current.map((a) =>
-          a.questionId === qId ? { ...a, is_correct: res?.is_correct ?? rd.isCorrect } : a
-        );
-
-        if (camRef.current) await camRef.current.stopAndUpload(sessionId!);
-        const result = await api.sessions.finish(sessionId!, {
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          tab_switch_count: tabSwitchCount,
-          face_anomaly_count: faceAnomalyCount,
-        });
-        api.sessions.logEvent(sessionId!, "close").catch(() => {});
-        onDone({
-          ...result,
-          session_id: sessionId,
-          module_id: moduleId,
-          answers: answersRef.current,
-          timeMs: Date.now() - startRef.current,
-          answers_revealed: (result as any).answers_revealed ?? true,
-        });
-      } catch {
-        if (camRef.current) await camRef.current.stopAndUpload(sessionId!).catch(() => {});
-        onDone({ score_pct: 0, session_id: sessionId, module_id: moduleId, answers: answersRef.current, timeMs: 0 });
-      }
+      await finishSession(rd.lastPayload, rd.isCorrect);
     } else {
       setIdx((i) => i + 1);
       resetQ();
@@ -309,7 +375,19 @@ export function TestScreen({ moduleId, onExit, onDone, resumeData }: Props) {
         <div className="head-progress"><ProgressBar value={progress} /></div>
         <div className="head-meta mono">
           <ClockIcon size={13} />
-          <span>{formatTime(elapsed)}</span>
+          {examDurationMs ? (
+            (() => {
+              const left = Math.max(0, examDurationMs - elapsed);
+              const warn = left < 60000;
+              return (
+                <span style={{ color: warn ? "oklch(0.55 0.18 25)" : "var(--ink-2)", fontWeight: warn ? 700 : undefined }}>
+                  {formatTime(left)} left
+                </span>
+              );
+            })()
+          ) : (
+            <span>{formatTime(elapsed)}</span>
+          )}
           <span style={{ color: "var(--ink-3)" }}>{idx + 1} / {questions.length}</span>
           {tabSwitchCount > 0 && (
             <span style={{ color: "oklch(0.6 0.15 25)", fontSize: 11 }}>⚠ {tabSwitchCount} tab switch{tabSwitchCount !== 1 ? "es" : ""}</span>
@@ -334,6 +412,7 @@ export function TestScreen({ moduleId, onExit, onDone, resumeData }: Props) {
             {q.kind === "fill" ? "Fill in the blank"
               : q.kind === "match" ? "Match pairs"
               : q.kind === "listen_choice" ? "Listening"
+              : q.kind === "dictation" ? "Dictation"
               : "Multiple choice"}
           </div>
           <h2 className="serif q-prompt">{q.prompt}</h2>
@@ -344,7 +423,7 @@ export function TestScreen({ moduleId, onExit, onDone, resumeData }: Props) {
             </blockquote>
           )}
 
-          {q.kind === "listen_choice" && module?.audio_blob && (
+          {(q.kind === "listen_choice" || q.kind === "dictation") && module?.audio_blob && (
             <AudioPlayer src={`/api/v1/modules/${moduleId}/audio`} />
           )}
 
@@ -355,34 +434,7 @@ export function TestScreen({ moduleId, onExit, onDone, resumeData }: Props) {
             />
           )}
 
-          {revealData ? (
-            <>
-              <ul className="choices">
-                {revealData.choices.map((c: any, i: number) => (
-                  <li key={c.id} className="choice"
-                    data-correct={c.id === revealData.correctId ? true : undefined}
-                    data-wrong={c.id === revealData.chosenId && c.id !== revealData.correctId ? true : undefined}
-                    style={{ pointerEvents: "none", animationDelay: `${i * 30}ms` }}>
-                    <span className="choice-key mono">
-                      {c.id === revealData.correctId ? "✓" : c.id === revealData.chosenId ? "✗" : String.fromCharCode(65 + i)}
-                    </span>
-                    <span className="choice-label">{c.label}</span>
-                  </li>
-                ))}
-              </ul>
-              {revealData.explain && (
-                <div className="explain-box">
-                  <p className="eyebrow" style={{ marginBottom: 8, color: "var(--ink-3)" }}>Penjelasan / Explanation</p>
-                  <p className="explain-text">{revealData.explain}</p>
-                </div>
-              )}
-              <div className="q-footer">
-                <button className="btn accent lg q-submit" onClick={handleContinue} disabled={finishing}>
-                  {revealData.isLast ? (finishing ? "Finalizing…" : "See my score") : "Continue"} <ArrowRightIcon size={16} />
-                </button>
-              </div>
-            </>
-          ) : (
+          {revealData ? null : (
             <>
               {(q.kind === "choice" || q.kind === "listen_choice" || q.kind === "fill") && (
                 <ul className="choices">
@@ -405,6 +457,20 @@ export function TestScreen({ moduleId, onExit, onDone, resumeData }: Props) {
                   onKeyDown={(e) => e.key === "Enter" && canSubmit && submit()}
                   autoFocus
                 />
+              )}
+
+              {q.kind === "dictation" && (
+                <div className="dictation-input-wrap">
+                  <input
+                    className="fill-input"
+                    placeholder="Type what you heard…"
+                    value={fillInput}
+                    onChange={(e) => setFillInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && canSubmit && submit()}
+                    autoFocus
+                  />
+                  <p className="dictation-hint eyebrow">Listen to the audio, then type exactly what you hear</p>
+                </div>
               )}
 
               {q.kind === "match" && (
@@ -447,15 +513,30 @@ export function TestScreen({ moduleId, onExit, onDone, resumeData }: Props) {
           )}
         </section>
 
-        <aside className="camera-pane fade-up" style={{ animationDelay: "100ms" }}>
-          <CameraCapture
-            ref={camRef}
-            sessionId={sessionId}
-            currentQuestionId={q.id}
-            onFaceAnomaly={handleFaceAnomaly}
-          />
-        </aside>
+        {(module as any)?.require_camera !== false && (
+          <aside className="camera-pane fade-up" style={{ animationDelay: "100ms" }}>
+            <CameraCapture
+              ref={camRef}
+              sessionId={sessionId}
+              currentQuestionId={q.id}
+              onFaceAnomaly={handleFaceAnomaly}
+            />
+          </aside>
+        )}
       </main>
+
+      {revealData && (
+        <FeedbackPanel
+          correctId={revealData.correctId}
+          chosenId={revealData.chosenId}
+          isCorrect={revealData.isCorrect}
+          explain={revealData.explain}
+          choices={revealData.choices}
+          isLast={revealData.isLast}
+          finishing={finishing}
+          onContinue={handleContinue}
+        />
+      )}
 
       {exitDialog && (
         <div style={{

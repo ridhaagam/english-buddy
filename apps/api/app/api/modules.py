@@ -145,6 +145,10 @@ async def get_module(
         "deadline": m.deadline.isoformat() if m.deadline else None,
         "is_closed": m.is_closed,
         "max_attempts": m.max_attempts,
+        "show_live_feedback": m.show_live_feedback,
+        "is_exam": m.is_exam,
+        "exam_duration_minutes": m.exam_duration_minutes,
+        "require_camera": user.require_camera,
         "questions": [
             {
                 "id": str(q.id),

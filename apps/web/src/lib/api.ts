@@ -185,7 +185,7 @@ export const api = {
       get: (id: string) => request<any>(`/admin/modules/${id}`),
       create: (data: any) => request<any>("/admin/modules", { method: "POST", body: JSON.stringify(data) }),
       update: (id: string, data: any) => request<any>(`/admin/modules/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
-      updateSettings: (id: string, data: { deadline?: string | null; is_closed: boolean; max_attempts?: number | null; show_answers_after_deadline?: boolean; reveal_at?: string | null }) =>
+      updateSettings: (id: string, data: { deadline?: string | null; is_closed: boolean; max_attempts?: number | null; show_answers_after_deadline?: boolean; reveal_at?: string | null; show_live_feedback?: boolean; is_exam?: boolean; exam_duration_minutes?: number | null }) =>
         request<any>(`/admin/modules/${id}/settings`, { method: "PATCH", body: JSON.stringify(data) }),
       delete: (id: string) => request<void>(`/admin/modules/${id}`, { method: "DELETE" }),
       publish: (id: string) => request<any>(`/admin/modules/${id}/publish`, { method: "POST" }),
@@ -264,6 +264,8 @@ export const api = {
       },
       createLearner: (data: { email: string; display_name: string; password?: string }) =>
         request<any>("/admin/users/learners", { method: "POST", body: JSON.stringify(data) }),
+      patchLearner: (id: string, data: { require_camera?: boolean }) =>
+        request<any>(`/admin/users/learners/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
       deleteLearner: (id: string) => request<void>(`/admin/users/${id}`, { method: "DELETE" }),
     },
     auditLog: {

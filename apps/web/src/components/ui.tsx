@@ -227,7 +227,7 @@ export function Topbar({ route, onNav, user, onLogout, onOpenAdmin }: TopbarProp
                   <ShieldIcon /> Admin
                 </button>
               )}
-              <span className="mono" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--ink-2)", background: "var(--amber-soft)", padding: "6px 10px", borderRadius: 999 }}>
+              <span className="topbar-streak mono" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--ink-2)", background: "var(--amber-soft)", padding: "6px 10px", borderRadius: 999 }}>
                 <FlameIcon size={12} /> {user.streak}d
               </span>
               {/* Avatar dropdown */}

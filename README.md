@@ -139,6 +139,18 @@ The AI models run in the `worker` container. First run downloads weights — thi
 
 ---
 
+## System flow diagrams
+
+After starting the app, open **http://localhost:5173/flows.html** in a browser to see:
+
+- **Learner flow** — login → library → exam vs practice → test → results
+- **Admin flow** — module creation, course enrollment, recording review
+- **Content pipeline** — PDF/audio import through whisper and Qwen to published module
+
+The diagrams are static HTML (no server needed) and live at `apps/web/public/flows.html`.
+
+---
+
 ## Design principles
 
 - **No confetti, no mascots.** XP and streaks are present but quiet. The UI is a study journal, not a game.

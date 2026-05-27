@@ -5,20 +5,12 @@ from sqlalchemy import select
 
 from app.core.database import AsyncSessionLocal
 from app.core.security import hash_password
-from app.models.achievement import Achievement, UserAchievement
+from app.models.achievement import UserAchievement
 from app.models.module import CefrLevel, Module, ModuleStatus, SourceKind, TopicType
 from app.models.question import Question, QuestionKind
 from app.models.session import Session, SessionAnswer
 from app.models.user import User, UserRole
 
-
-ACHIEVEMENTS = [
-    {"id": "week_streak", "title": "Week-long streak", "sub": "7 days in a row", "criteria": {"streak_days": 7}},
-    {"id": "centurion", "title": "Centurion", "sub": "100 words learned", "criteria": {"words": 100}},
-    {"id": "perfect_set", "title": "Perfect set", "sub": "100% on a module", "criteria": {"score": 100}},
-    {"id": "owl_mode", "title": "Owl mode", "sub": "Practice after 10 PM", "criteria": {"hour_ge": 22}},
-    {"id": "marathoner", "title": "Marathoner", "sub": "30 day streak", "criteria": {"streak_days": 30}},
-]
 
 # ---------------------------------------------------------------------------
 # Vocabulary modules — 60 words from vocabulary.pdf split into 6 sets
@@ -663,7 +655,122 @@ SPEAKING_MODULE = {
     ],
 }
 
-ALL_MODULES = VOCAB_MODULES + GRAMMAR_MODULES + [SPEAKING_MODULE]
+DICTATION_MODULE = {
+    "title": "Dictation · Basic English Sentences",
+    "topic": TopicType.writing,
+    "level": CefrLevel.B1,
+    "status": ModuleStatus.published,
+    # Audio must be added via Admin → Listening import after seeding.
+    "questions": [
+        {
+            "kind": QuestionKind.dictation,
+            "prompt": "Listen carefully and type exactly what you hear.",
+            "payload": {"answer": "The image was captured clearly."},
+        },
+        {
+            "kind": QuestionKind.dictation,
+            "prompt": "Listen and write the sentence you hear.",
+            "payload": {"answer": "She practices English every morning."},
+        },
+        {
+            "kind": QuestionKind.dictation,
+            "prompt": "Type what you hear.",
+            "payload": {"answer": "The model detects objects in real time."},
+        },
+        {
+            "kind": QuestionKind.dictation,
+            "prompt": "Listen carefully and write the sentence.",
+            "payload": {"answer": "Good generalization is important for machine learning."},
+        },
+        {
+            "kind": QuestionKind.dictation,
+            "prompt": "Type the sentence you hear.",
+            "payload": {"answer": "Rain causes degradation in camera footage."},
+        },
+    ],
+}
+
+LISTENING_MODULE = {
+    "title": "Listening · Daily Conversations",
+    "topic": TopicType.listening,
+    "level": CefrLevel.A2,
+    "status": ModuleStatus.published,
+    # Audio must be uploaded via Admin → Listening import after seeding.
+    "questions": [
+        {
+            "kind": QuestionKind.listen_choice,
+            "prompt": "According to the audio, what is the main problem?",
+            "payload": {
+                "choices": [
+                    {"id": "a", "label": "The internet is too slow"},
+                    {"id": "b", "label": "The camera is not working"},
+                    {"id": "c", "label": "The weather is bad"},
+                    {"id": "d", "label": "The battery is dead"},
+                ],
+                "answer": "c",
+            },
+            "explain": "The speaker mentions bad weather as the main problem affecting the camera.",
+        },
+        {
+            "kind": QuestionKind.listen_choice,
+            "prompt": "What does the speaker say about the new model?",
+            "payload": {
+                "choices": [
+                    {"id": "a", "label": "It is very expensive"},
+                    {"id": "b", "label": "It is lightweight and fast"},
+                    {"id": "c", "label": "It needs more training data"},
+                    {"id": "d", "label": "It only works in daylight"},
+                ],
+                "answer": "b",
+            },
+            "explain": "The speaker describes the new model as lightweight and fast.",
+        },
+        {
+            "kind": QuestionKind.listen_choice,
+            "prompt": "What will they do next, according to the conversation?",
+            "payload": {
+                "choices": [
+                    {"id": "a", "label": "Run more tests"},
+                    {"id": "b", "label": "Write a report"},
+                    {"id": "c", "label": "Take a break"},
+                    {"id": "d", "label": "Call the supervisor"},
+                ],
+                "answer": "a",
+            },
+            "explain": "They agree to run additional tests to verify the results.",
+        },
+        {
+            "kind": QuestionKind.listen_choice,
+            "prompt": "How does the speaker feel about the results?",
+            "payload": {
+                "choices": [
+                    {"id": "a", "label": "Disappointed"},
+                    {"id": "b", "label": "Confident and satisfied"},
+                    {"id": "c", "label": "Confused"},
+                    {"id": "d", "label": "Worried about deadlines"},
+                ],
+                "answer": "b",
+            },
+            "explain": "The speaker's tone indicates confidence and satisfaction with the outcome.",
+        },
+        {
+            "kind": QuestionKind.listen_choice,
+            "prompt": "What does the speaker recommend?",
+            "payload": {
+                "choices": [
+                    {"id": "a", "label": "Use a simpler model"},
+                    {"id": "b", "label": "Collect more data from rain conditions"},
+                    {"id": "c", "label": "Switch to a different framework"},
+                    {"id": "d", "label": "Present results to the team first"},
+                ],
+                "answer": "b",
+            },
+            "explain": "The speaker recommends collecting more data specifically from rainy conditions.",
+        },
+    ],
+}
+
+ALL_MODULES = VOCAB_MODULES + GRAMMAR_MODULES + [SPEAKING_MODULE, DICTATION_MODULE, LISTENING_MODULE]
 
 
 async def seed():
@@ -696,10 +803,8 @@ async def seed():
         db.add(learner)
         await db.flush()
 
-        for a in ACHIEVEMENTS:
-            db.add(Achievement(**a))
-        await db.flush()
-
+        # Achievements are seeded by migration 003 — no need to re-insert here.
+        # Grant the demo admin the week_streak badge as illustrative data.
         db.add(UserAchievement(user_id=owner.id, achievement_id="week_streak", progress_pct=100.0))
 
         seeded_modules = []

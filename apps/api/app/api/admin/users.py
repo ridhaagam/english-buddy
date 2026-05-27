@@ -26,6 +26,10 @@ class PatchRoleBody(BaseModel):
     role: str
 
 
+class PatchLearnerBody(BaseModel):
+    require_camera: bool | None = None
+
+
 class LearnerCreateBody(BaseModel):
     email: EmailStr
     display_name: str
@@ -52,26 +56,34 @@ async def list_learners(
     result = await db.execute(q)
     users = result.scalars().all()
 
-    out = []
-    for u in users:
-        stats = await db.execute(
-            select(func.count(), func.avg(Session.score_pct))
-            .where(and_(Session.user_id == u.id, Session.finished_at.isnot(None)))
-        )
-        srow = stats.one()
-        out.append({
+    if not users:
+        return []
+
+    # Batch all session stats in a single grouped query — avoid N+1
+    user_ids = [u.id for u in users]
+    stats_r = await db.execute(
+        select(Session.user_id, func.count().label("total"), func.avg(Session.score_pct).label("avg"))
+        .where(and_(Session.user_id.in_(user_ids), Session.finished_at.isnot(None)))
+        .group_by(Session.user_id)
+    )
+    stats_map = {row.user_id: row for row in stats_r.all()}
+
+    return [
+        {
             "id": str(u.id),
             "email": u.email,
             "display_name": u.display_name,
             "role": u.role.value,
             "streak": u.streak,
             "xp_total": u.xp_total,
-            "total_sessions": srow[0] or 0,
-            "avg_score": round(float(srow[1] or 0)),
+            "total_sessions": stats_map[u.id].total if u.id in stats_map else 0,
+            "avg_score": round(float(stats_map[u.id].avg or 0)) if u.id in stats_map else 0,
+            "require_camera": u.require_camera,
             "created_at": u.created_at.isoformat(),
             "last_seen_at": u.last_seen_at.isoformat() if u.last_seen_at else None,
-        })
-    return out
+        }
+        for u in users
+    ]
 
 
 @router.post("/learners", status_code=201)
@@ -95,6 +107,23 @@ async def create_learner(
     await db.commit()
     await db.refresh(new_user)
     return {"id": str(new_user.id)}
+
+
+@router.patch("/learners/{user_id}")
+async def patch_learner(
+    user_id: UUID,
+    body: PatchLearnerBody,
+    current_user: AdminUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    result = await db.execute(select(User).where(and_(User.id == user_id, User.role == UserRole.learner)))
+    target = result.scalar_one_or_none()
+    if not target:
+        raise HTTPException(404, "Learner not found")
+    if body.require_camera is not None:
+        target.require_camera = body.require_camera
+    await db.commit()
+    return {"id": str(target.id), "require_camera": target.require_camera}
 
 
 @router.get("")

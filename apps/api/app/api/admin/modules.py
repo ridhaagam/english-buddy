@@ -52,6 +52,9 @@ class ModuleOut(BaseModel):
     max_attempts: int | None = None
     reveal_at: str | None = None
     show_answers_after_deadline: bool = False
+    show_live_feedback: bool = False
+    is_exam: bool = False
+    exam_duration_minutes: int | None = None
 
 
 class ModuleSettingsBody(BaseModel):
@@ -60,6 +63,9 @@ class ModuleSettingsBody(BaseModel):
     max_attempts: int | None = None
     show_answers_after_deadline: bool = False
     reveal_at: str | None = None
+    show_live_feedback: bool = False
+    is_exam: bool = False
+    exam_duration_minutes: int | None = None
 
 
 @router.get("", response_model=list[ModuleOut])
@@ -123,6 +129,9 @@ async def list_all_modules(
             max_attempts=m.max_attempts,
             reveal_at=m.reveal_at.isoformat() if m.reveal_at else None,
             show_answers_after_deadline=m.show_answers_after_deadline,
+            show_live_feedback=m.show_live_feedback,
+            is_exam=m.is_exam,
+            exam_duration_minutes=m.exam_duration_minutes,
         ))
     return out
 
@@ -179,6 +188,9 @@ async def update_module_settings(
     m.is_closed = body.is_closed
     m.max_attempts = body.max_attempts
     m.show_answers_after_deadline = body.show_answers_after_deadline
+    m.show_live_feedback = body.show_live_feedback
+    m.is_exam = body.is_exam
+    m.exam_duration_minutes = body.exam_duration_minutes
 
     from app.api.admin.audit import write_log
     await write_log(db, actor_id=user.id, action="update_module_settings", target_kind="module", target_id=str(module_id),
@@ -330,6 +342,9 @@ async def get_module_detail(
         "max_attempts": m.max_attempts,
         "reveal_at": m.reveal_at.isoformat() if m.reveal_at else None,
         "show_answers_after_deadline": m.show_answers_after_deadline,
+        "show_live_feedback": m.show_live_feedback,
+        "is_exam": m.is_exam,
+        "exam_duration_minutes": m.exam_duration_minutes,
         "questions": [
             {
                 "id": str(q.id),

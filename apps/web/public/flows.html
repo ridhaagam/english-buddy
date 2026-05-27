@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>EnglishBuddy — System Flows</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700;9..144,900&family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:      #0d0f14;
+    --surface: #141720;
+    --line:    #252a36;
+    --ink:     #e8eaf0;
+    --ink-2:   #8890a4;
+    --ink-3:   #4a5268;
+
+    --learner: #34d399;  /* emerald */
+    --admin:   #60a5fa;  /* blue */
+    --content: #f59e0b;  /* amber */
+    --system:  #a78bfa;  /* violet */
+
+    --r: 12px;
+    --ff-display: 'Fraunces', Georgia, serif;
+    --ff-body: 'DM Sans', system-ui, sans-serif;
+    --ff-mono: 'DM Mono', monospace;
+  }
+
+  body {
+    font-family: var(--ff-body);
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+    padding: 0 0 80px;
+  }
+
+  /* ── Nav ── */
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: color-mix(in oklch, var(--bg) 80%, transparent);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--line);
+    padding: 16px 32px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+  .nav-logo {
+    font-family: var(--ff-display);
+    font-size: 18px;
+    font-weight: 900;
+    color: var(--ink);
+    letter-spacing: -0.02em;
+    margin-right: auto;
+  }
+  .nav-tab {
+    padding: 7px 16px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1.5px solid var(--line);
+    background: transparent;
+    color: var(--ink-2);
+    transition: all 0.18s;
+    text-decoration: none;
+  }
+  .nav-tab:hover, .nav-tab.active {
+    border-color: transparent;
+    color: #0d0f14;
+  }
+  .nav-tab[data-color="learner"] { --c: var(--learner); }
+  .nav-tab[data-color="admin"]   { --c: var(--admin); }
+  .nav-tab[data-color="content"] { --c: var(--content); }
+  .nav-tab:hover, .nav-tab.active { background: var(--c); color: #0d0f14; }
+
+  /* ── Sections ── */
+  .section {
+    display: none;
+    padding: 48px 32px 0;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  .section.visible { display: block; }
+
+  .section-head {
+    margin-bottom: 40px;
+  }
+  .section-eyebrow {
+    font-family: var(--ff-mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .section-title {
+    font-family: var(--ff-display);
+    font-size: 42px;
+    font-weight: 900;
+    letter-spacing: -0.025em;
+    line-height: 1;
+    margin-bottom: 10px;
+  }
+  .section-desc {
+    font-size: 14px;
+    color: var(--ink-2);
+    line-height: 1.6;
+    max-width: 560px;
+  }
+
+  /* ── Flow canvas ── */
+  .flow-canvas {
+    position: relative;
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 24px;
+  }
+  .flow-svg {
+    min-width: 900px;
+    width: 100%;
+  }
+
+  /* ── Flow nodes ── */
+  .node-group { cursor: default; }
+  .node-rect {
+    fill: var(--surface);
+    stroke: var(--line);
+    stroke-width: 1.5;
+    rx: 12;
+    transition: stroke 0.2s;
+  }
+  .node-group:hover .node-rect { stroke-width: 2; }
+  .node-label {
+    font-family: var(--ff-body);
+    font-size: 13px;
+    font-weight: 600;
+    fill: var(--ink);
+    text-anchor: middle;
+    dominant-baseline: central;
+  }
+  .node-sub {
+    font-family: var(--ff-body);
+    font-size: 11px;
+    font-weight: 400;
+    fill: var(--ink-2);
+    text-anchor: middle;
+    dominant-baseline: central;
+  }
+  .node-icon {
+    font-size: 18px;
+    text-anchor: middle;
+    dominant-baseline: central;
+  }
+  .node-badge {
+    font-family: var(--ff-mono);
+    font-size: 9px;
+    font-weight: 500;
+    text-anchor: middle;
+    dominant-baseline: central;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  /* Arrow paths */
+  .arrow {
+    fill: none;
+    stroke: var(--line);
+    stroke-width: 1.5;
+    marker-end: url(#arrowhead);
+  }
+  .arrow-label {
+    font-family: var(--ff-mono);
+    font-size: 10px;
+    fill: var(--ink-3);
+    text-anchor: middle;
+  }
+  .arrow-branch {
+    stroke: var(--line);
+    stroke-dasharray: 5,3;
+  }
+
+  /* Legend */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    margin-top: 32px;
+    padding: 20px 24px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--ink-2);
+  }
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+
+  /* ── Feature table ── */
+  .feat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px;
+    margin-top: 32px;
+  }
+  .feat-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    padding: 18px 20px;
+    transition: border-color 0.2s;
+  }
+  .feat-card:hover { border-color: var(--ink-3); }
+  .feat-card-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .feat-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .feat-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .feat-desc {
+    font-size: 12px;
+    color: var(--ink-2);
+    line-height: 1.55;
+  }
+  .feat-tag {
+    display: inline-block;
+    margin-top: 8px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-family: var(--ff-mono);
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <span class="nav-logo">EnglishBuddy — Flows</span>
+  <a class="nav-tab active" data-color="learner" data-tab="learner" href="#">Learner</a>
+  <a class="nav-tab" data-color="admin" data-tab="admin" href="#">Admin</a>
+  <a class="nav-tab" data-color="content" data-tab="content" href="#">Content</a>
+</nav>
+
+<!-- ══════════════════════════════════════════════════════════════
+     LEARNER FLOW
+══════════════════════════════════════════════════════════════ -->
+<section class="section visible" id="sec-learner">
+  <div class="section-head">
+    <p class="section-eyebrow" style="color:var(--learner)">Role · Learner</p>
+    <h1 class="section-title" style="color:var(--learner)">Student Journey</h1>
+    <p class="section-desc">End-to-end flow for a learner from login through completing a module and reviewing their history.</p>
+  </div>
+
+  <div class="flow-canvas">
+    <svg class="flow-svg" viewBox="0 0 960 620" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#4a5268" />
+        </marker>
+        <marker id="arrowhead-green" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#34d399" />
+        </marker>
+      </defs>
+
+      <!-- Row 1 -->
+      <!-- Login -->
+      <g class="node-group" transform="translate(40,40)">
+        <rect class="node-rect" width="130" height="64" style="stroke:#34d399" />
+        <text class="node-icon" x="65" y="24">🔐</text>
+        <text class="node-label" x="65" y="44">Login</text>
+        <text class="node-sub" x="65" y="58" style="font-size:10px">email + password</text>
+      </g>
+
+      <!-- Arrow → Library -->
+      <path class="arrow" d="M170,72 L210,72" />
+
+      <!-- Library -->
+      <g class="node-group" transform="translate(210,40)">
+        <rect class="node-rect" width="140" height="64" />
+        <text class="node-icon" x="70" y="24">📚</text>
+        <text class="node-label" x="70" y="44">Library</text>
+        <text class="node-sub" x="70" y="58" style="font-size:10px">browse modules</text>
+      </g>
+
+      <!-- Arrow → Module card -->
+      <path class="arrow" d="M350,72 L390,72" />
+
+      <!-- Module card -->
+      <g class="node-group" transform="translate(390,40)">
+        <rect class="node-rect" width="140" height="64" />
+        <text class="node-icon" x="70" y="24">📋</text>
+        <text class="node-label" x="70" y="44">Module Card</text>
+        <text class="node-sub" x="70" y="58" style="font-size:10px">title · level · score</text>
+      </g>
+
+      <!-- Arrow → Resume check -->
+      <path class="arrow" d="M530,72 L570,72" />
+
+      <!-- Resume? diamond -->
+      <g class="node-group" transform="translate(570,44)">
+        <polygon points="45,0 90,28 45,56 0,28" style="fill:#141720;stroke:#4a5268;stroke-width:1.5" />
+        <text class="node-label" x="45" y="28" style="font-size:11px">Resume?</text>
+      </g>
+
+      <!-- Resume YES → Resume session -->
+      <path class="arrow" d="M660,72 L700,72" />
+      <text class="arrow-label" x="680" y="64">yes</text>
+
+      <g class="node-group" transform="translate(700,40)">
+        <rect class="node-rect" width="140" height="64" style="stroke:#f59e0b" />
+        <text class="node-icon" x="70" y="24">⏩</text>
+        <text class="node-label" x="70" y="44">Resume Session</text>
+        <text class="node-sub" x="70" y="58" style="font-size:10px">skip answered Qs</text>
+      </g>
+
+      <!-- Resume NO → New session (down) -->
+      <path class="arrow" d="M615,100 L615,140 L700,140" />
+      <text class="arrow-label" x="648" y="130">no</text>
+
+      <!-- New Session -->
+      <g class="node-group" transform="translate(700,108)">
+        <rect class="node-rect" width="140" height="64" style="stroke:#34d399" />
+        <text class="node-icon" x="70" y="24">▶</text>
+        <text class="node-label" x="70" y="44">New Session</text>
+        <text class="node-sub" x="70" y="58" style="font-size:10px">shuffled questions</text>
+      </g>
+
+      <!-- Both resume/new → Question loop (down from both) -->
+      <path class="arrow" d="M770,104 L770,220" />
+      <path class="arrow" d="M770,172 L770,220" />
+
+      <!-- Row 2 — Question loop -->
+      <g class="node-group" transform="translate(560,220)">
+        <rect class="node-rect" width="420" height="60" style="stroke:#8890a4;stroke-dasharray:4,3" rx="14" />
+        <text class="node-sub" x="30" y="22" style="text-anchor:start;font-size:10px;fill:#4a5268">repeat per question</text>
+        <text class="node-label" x="210" y="36">Question Loop (choice / fill / match / listen)</text>
+      </g>
+
+      <!-- → Answer -->
+      <path class="arrow" d="M560,250 L510,250" />
+
+      <!-- Answer -->
+      <g class="node-group" transform="translate(380,222)">
+        <rect class="node-rect" width="130" height="56" />
+        <text class="node-icon" x="65" y="22">✏️</text>
+        <text class="node-label" x="65" y="40">Answer</text>
+        <text class="node-sub" x="65" y="52" style="font-size:9px">+ proctoring flags</text>
+      </g>
+
+      <!-- → live_feedback? -->
+      <path class="arrow" d="M380,250 L330,250" />
+
+      <!-- live_feedback diamond -->
+      <g class="node-group" transform="translate(244,226)">
+        <polygon points="43,0 86,24 43,48 0,24" style="fill:#141720;stroke:#4a5268;stroke-width:1.5" />
+        <text class="node-label" x="43" y="20" style="font-size:10px">live</text>
+        <text class="node-label" x="43" y="32" style="font-size:10px">feedback?</text>
+      </g>
+
+      <!-- YES → FeedbackPanel -->
+      <path class="arrow" d="M244,250 L170,250" />
+      <text class="arrow-label" x="207" y="242">on</text>
+
+      <g class="node-group" transform="translate(40,222)">
+        <rect class="node-rect" width="130" height="56" style="stroke:#34d399" />
+        <text class="node-icon" x="65" y="20">🟢</text>
+        <text class="node-label" x="65" y="36">Feedback Panel</text>
+        <text class="node-sub" x="65" y="50" style="font-size:9px">BENAR / SALAH</text>
+      </g>
+
+      <!-- FeedbackPanel → back to loop -->
+      <path class="arrow" style="stroke:#34d399;stroke-dasharray:4,3" d="M105,222 L105,186 L560,186 L560,220" />
+
+      <!-- NO (off) → straight advance -->
+      <path class="arrow" d="M287,226 L287,190 L505,190 L505,220" />
+      <text class="arrow-label" x="360" y="183">off → next Q</text>
+
+      <!-- Row 3 — Last question path -->
+      <path class="arrow" d="M770,280 L770,340" />
+      <text class="arrow-label" x="792" y="315">last Q</text>
+
+      <!-- Finish session -->
+      <g class="node-group" transform="translate(700,340)">
+        <rect class="node-rect" width="140" height="64" style="stroke:#a78bfa" />
+        <text class="node-icon" x="70" y="24">🏁</text>
+        <text class="node-label" x="70" y="44">Finish Session</text>
+        <text class="node-sub" x="70" y="58" style="font-size:10px">score · XP · upload cam</text>
+      </g>
+
+      <!-- → Results screen -->
+      <path class="arrow" d="M700,372 L620,372" />
+
+      <g class="node-group" transform="translate(490,344)">
+        <rect class="node-rect" width="130" height="56" style="stroke:#34d399" />
+        <text class="node-icon" x="65" y="20">🏆</text>
+        <text class="node-label" x="65" y="36">Results Screen</text>
+        <text class="node-sub" x="65" y="50" style="font-size:9px">score ring · XP</text>
+      </g>
+
+      <!-- → Practice History -->
+      <path class="arrow" d="M490,372 L420,372" />
+
+      <g class="node-group" transform="translate(290,344)">
+        <rect class="node-rect" width="130" height="56" />
+        <text class="node-icon" x="65" y="20">📊</text>
+        <text class="node-label" x="65" y="36">Practice History</text>
+        <text class="node-sub" x="65" y="50" style="font-size:9px">deduplicated list</text>
+      </g>
+
+      <!-- → Session Detail -->
+      <path class="arrow" d="M290,372 L220,372" />
+
+      <g class="node-group" transform="translate(90,344)">
+        <rect class="node-rect" width="130" height="56" />
+        <text class="node-icon" x="65" y="20">🔍</text>
+        <text class="node-label" x="65" y="36">Session Detail</text>
+        <text class="node-sub" x="65" y="50" style="font-size:9px">per-Q breakdown</text>
+      </g>
+
+      <!-- Profile path (from Library) -->
+      <path class="arrow" d="M280,104 L280,160 L60,160 L60,344" style="stroke-dasharray:5,3" />
+      <text class="arrow-label" x="110" y="152">profile</text>
+
+      <g class="node-group" transform="translate(40,440)">
+        <rect class="node-rect" width="130" height="56" />
+        <text class="node-icon" x="65" y="20">👤</text>
+        <text class="node-label" x="65" y="36">Profile Page</text>
+        <text class="node-sub" x="65" y="50" style="font-size:9px">XP · trophies · avatar</text>
+      </g>
+
+      <!-- Proctoring side note -->
+      <g transform="translate(860,220)">
+        <rect width="88" height="92" rx="10" style="fill:#141720;stroke:#252a36;stroke-width:1" />
+        <text style="font-family:'DM Mono',monospace;font-size:9px;fill:#4a5268;text-anchor:middle" x="44" y="16">proctoring</text>
+        <text style="font-size:11px;text-anchor:middle;dominant-baseline:central;fill:#8890a4" x="44" y="34">📷 camera</text>
+        <text style="font-size:11px;text-anchor:middle;dominant-baseline:central;fill:#8890a4" x="44" y="52">👁 tab switch</text>
+        <text style="font-size:11px;text-anchor:middle;dominant-baseline:central;fill:#8890a4" x="44" y="70">😐 face detect</text>
+      </g>
+      <path style="stroke:#252a36;stroke-dasharray:3,3;fill:none" d="M860,250 L840,250 L840,250" />
+    </svg>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#34d399"></div> Learner screen / action</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#a78bfa"></div> System / API action</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div> Conditional path</div>
+    <div class="legend-item" style="gap:14px"><svg width="30" height="12"><line x1="0" y1="6" x2="30" y2="6" stroke="#4a5268" stroke-width="1.5" stroke-dasharray="4,3"/></svg> Optional path</div>
+  </div>
+
+  <div class="feat-grid">
+    <div class="feat-card">
+      <div class="feat-card-head">
+        <div class="feat-icon" style="background:oklch(0.25 0.08 142)">🟢</div>
+        <span class="feat-title">Feedback Panel</span>
+      </div>
+      <p class="feat-desc">Coaching-card bottom sheet with BENAR/SALAH verdict, answer comparison cards, and structured bilingual explanation. Only shown when module has show_live_feedback = true.</p>
+      <span class="feat-tag" style="background:oklch(0.2 0.08 142);color:#34d399">new design</span>
+    </div>
+    <div class="feat-card">
+      <div class="feat-card-head">
+        <div class="feat-icon" style="background:oklch(0.2 0.06 250)">⏩</div>
+        <span class="feat-title">Session Resume</span>
+      </div>
+      <p class="feat-desc">If an in-progress session exists for a module, learner can resume from the last unanswered question. Questions are shuffled with the session ID as the RNG seed.</p>
+      <span class="feat-tag" style="background:oklch(0.18 0.06 250);color:#60a5fa">implemented</span>
+    </div>
+    <div class="feat-card">
+      <div class="feat-card-head">
+        <div class="feat-icon" style="background:oklch(0.22 0.06 280)">📊</div>
+        <span class="feat-title">Deduplicated History</span>
+      </div>
+      <p class="feat-desc">Practice screen shows one row per module (best attempt). "View all attempts" expands to full history for that module.</p>
+      <span class="feat-tag" style="background:oklch(0.18 0.06 280);color:#a78bfa">implemented</span>
+    </div>
+    <div class="feat-card">
+      <div class="feat-card-head">
+        <div class="feat-icon" style="background:oklch(0.22 0.07 65)">📷</div>
+        <span class="feat-title">Proctoring</span>
+      </div>
+      <p class="feat-desc">Camera records in 15fps WebM chunks uploaded continuously. face-api.js detects anomalies every 5s. Tab-switch events are tracked per question.</p>
+      <span class="feat-tag" style="background:oklch(0.2 0.07 65);color:#f59e0b">active</span>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════
+     ADMIN FLOW
+══════════════════════════════════════════════════════════════ -->
+<section class="section" id="sec-admin">
+  <div class="section-head">
+    <p class="section-eyebrow" style="color:var(--admin)">Role · Admin / Owner</p>
+    <h1 class="section-title" style="color:var(--admin)">Admin Dashboard</h1>
+    <p class="section-desc">Full control surface for managing modules, learners, recordings, and reports.</p>
+  </div>
+
+  <div class="flow-canvas">
+    <svg class="flow-svg" viewBox="0 0 960 560" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arrowhead-b" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#4a5268" />
+        </marker>
+      </defs>
+
+      <!-- Login -->
+      <g class="node-group" transform="translate(40,40)">
+        <rect class="node-rect" width="120" height="56" style="stroke:#60a5fa" />
+        <text class="node-icon" x="60" y="22">🔐</text>
+        <text class="node-label" x="60" y="40">Admin Login</text>
+      </g>
+      <path class="arrow" marker-end="url(#arrowhead-b)" d="M160,68 L200,68" />
+
+      <!-- Dashboard -->
+      <g class="node-group" transform="translate(200,40)">
+        <rect class="node-rect" width="130" height="56" style="stroke:#60a5fa" />
+        <text class="node-icon" x="65" y="22">📊</text>
+        <text class="node-label" x="65" y="40">Dashboard</text>
+        <text class="node-sub" x="65" y="52" style="font-size:9px">KPIs · activity</text>
+      </g>
+
+      <!-- Branches from dashboard -->
+      <!-- Modules -->
+      <path class="arrow" marker-end="url(#arrowhead-b)" d="M265,96 L265,140" />
+      <g class="node-group" transform="translate(200,140)">
+        <rect class="node-rect" width="130" height="56" />
+        <text class="node-icon" x="65" y="22">📋</text>
+        <text class="node-label" x="65" y="40">Modules</text>
+        <text class="node-sub" x="65" y="52" style="font-size:9px">create · edit · publish</text>
+      </g>
+
+      <!-- Module settings branch -->
+      <path class="arrow" marker-end="url(#arrowhead-b)" d="M330,168 L380,168" />
+      <g class="node-group" transform="translate(380,140)">
+        <rect class="node-rect" width="160" height="56" style="stroke:#f59e0b" />
+        <text class="node-icon" x="80" y="22">⚙️</text>
+        <text class="node-label" x="80" y="40">Module Settings</text>
+        <text class="node-sub" x="80" y="52" style="font-size:9px">deadline · attempts · feedback</text>
+      </g>
+
+      <!-- show_live_feedback callout -->
+      <g transform="translate(545,128)">
+        <rect width="120" height="36" rx="8" style="fill:oklch(0.18 0.07 65);stroke:oklch(0.4 0.12 65);stroke-width:1" />
+        <text style="font-family:'DM Mono',monospace;font-size:9px;fill:#f59e0b;text-anchor:middle" x="60" y="14">show_live_feedback</text>
+        <text style="font-size:9px;fill:#8890a4;text-anchor:middle" x="60" y="26">toggles benar/salah</text>
+      </g>
+      <path style="stroke:#f59e0b;stroke-dasharray:3,3;fill:none" d="M540,162 L545,146" />
+
+      <!-- Import path -->
+      <path class="arrow" marker-end="url(#arrowhead-b)" d="M330,196 L380,230" style="stroke:#8890a4" />
+      <g class="node-group" transform="translate(380,210)">
+        <rect class="node-rect" width="140" height="56" />
+        <text class="node-icon" x="70" y="22">📥</text>
+        <text class="node-label" x="70" y="40">Import</text>
+        <text class="node-sub" x="70" y="52" style="font-size:9px">PDF / DOCX / Audio</text>
+      </g>
+
+      <!-- Learners -->
+      <path class="arrow" marker-end="url(#arrowhead-b)" d="M200,168 L140,168 L140,260" style="stroke:#8890a4" />
+      <g class="node-group" transform="translate(40,260)">
+        <rect class="node-rect" width="130" height="56" />
+        <text class="node-icon" x="65" y="22">👥</text>
+        <text class="node-label" x="65" y="40">Learners</text>
+        <text class="node-sub" x="65" y="52" style="font-size:9px">create · search · delete</text>
+      </g>
+
+      <!-- Courses -->
+      <path class="arrow" marker-end="url(#arrowhead-b)" d="M170,288 L210,288" />
+      <g class="node-group" transform="translate(210,260)">
+        <rect class="node-rect" width="130" height="56" />
+        <text class="node-icon" x="65" y="22">🎓</text>
+        <text class="node-label" x="65" y="40">Courses</text>
+        <text class="node-sub" x="65" y="52" style="font-size:9px">enroll learners</text>
+      </g>
+
+      <!-- Assign (direct) -->
+      <path class="arrow" marker-end="url(#arrowhead-b)" d="M340,288 L380,288" />
+      <g class="node-group" transform="translate(380,260)">
+        <rect class="node-rect" width="130" height="56" />
+        <text class="node-icon" x="65" y="22">📌</text>
+        <text class="node-label" x="65" y="40">Assign Module</text>
+        <text class="node-sub" x="65" y="52" style="font-size:9px">direct access</text>
+      </g>
+
+      <!-- Recordings -->
+      <path class="arrow" marker-end="url(#arrowhead-b)" d="M265,40 L780,40 L780,100" style="stroke:#8890a4;stroke-dasharray:4,3" />
+      <g class="node-group" transform="translate(720,100)">
+        <rect class="node-rect" width="140" height="56" style="stroke:#60a5fa" />
+        <text class="node-icon" x="70" y="22">🎥</text>
+        <text class="node-label" x="70" y="40">Recordings</text>
+        <text class="node-sub" x="70" y="52" style="font-size:9px">sessions list</text>
+      </g>
+
+      <!-- → Recording detail -->
+      <path class="arrow" marker-end="url(#arrowhead-b)" d="M790,156 L790,200" />
+      <g class="node-group" transform="translate(720,200)">
+        <rect class="node-rect" width="140" height="64" />
+        <text class="node-icon" x="70" y="22">🔍</text>
+        <text class="node-label" x="70" y="40">Session Detail</text>
+        <text class="node-sub" x="70" y="54" style="font-size:9px">video · per-Q answers</text>
+      </g>
+
+      <!-- → Flag -->
+      <path class="arrow" marker-end="url(#arrowhead-b)" d="M790,264 L790,310" />
+      <g class="node-group" transform="translate(720,310)">
+        <rect class="node-rect" width="140" height="56" style="stroke:oklch(0.6 0.15 25)" />
+        <text class="node-icon" x="70" y="22">🚩</text>
+        <text class="node-label" x="70" y="40">Flag Answer</text>
+        <text class="node-sub" x="70" y="52" style="font-size:9px">comment · tab · face</text>
+      </g>
+
+      <!-- Reports -->
+      <path class="arrow" marker-end="url(#arrowhead-b)" d="M330,40 L570,40 L570,100" style="stroke:#8890a4;stroke-dasharray:4,3" />
+      <g class="node-group" transform="translate(510,100)">
+        <rect class="node-rect" width="140" height="56" />
+        <text class="node-icon" x="70" y="22">📈</text>
+        <text class="node-label" x="70" y="40">Reports</text>
+        <text class="node-sub" x="70" y="52" style="font-size:9px">KPIs · daily · funnel</text>
+      </g>
+
+      <!-- Audit Log -->
+      <path class="arrow" marker-end="url(#arrowhead-b)" d="M580,156 L580,200" />
+      <g class="node-group" transform="translate(510,200)">
+        <rect class="node-rect" width="140" height="56" />
+        <text class="node-icon" x="70" y="22">📝</text>
+        <text class="node-label" x="70" y="40">Audit Log</text>
+        <text class="node-sub" x="70" y="52" style="font-size:9px">all admin actions</text>
+      </g>
+    </svg>
+  </div>
+
+  <div class="feat-grid">
+    <div class="feat-card">
+      <div class="feat-card-head"><div class="feat-icon" style="background:oklch(0.2 0.07 262)">⚙️</div><span class="feat-title">Module Settings</span></div>
+      <p class="feat-desc">Deadline, max attempts, close toggle, show_answers_after_deadline, and the new show_live_feedback flag — all in one PATCH /settings endpoint.</p>
+      <span class="feat-tag" style="background:oklch(0.18 0.07 262);color:#60a5fa">6 fields</span>
+    </div>
+    <div class="feat-card">
+      <div class="feat-card-head"><div class="feat-icon" style="background:oklch(0.22 0.05 25)">🚩</div><span class="feat-title">Per-Answer Flagging</span></div>
+      <p class="feat-desc">Admin can flag individual answers with comments, tab-switch markers, and face-anomaly tags. Flagged answers hide correct answer in learner's session detail view.</p>
+      <span class="feat-tag" style="background:oklch(0.18 0.05 25);color:#f87171">proctoring</span>
+    </div>
+    <div class="feat-card">
+      <div class="feat-card-head"><div class="feat-icon" style="background:oklch(0.2 0.07 142)">👥</div><span class="feat-title">Learner Management</span></div>
+      <p class="feat-desc">Separate from staff management. Create, search, and delete learner accounts. Enroll via courses (bulk) or direct per-module assignment.</p>
+      <span class="feat-tag" style="background:oklch(0.18 0.07 142);color:#34d399">new tab</span>
+    </div>
+    <div class="feat-card">
+      <div class="feat-card-head"><div class="feat-icon" style="background:oklch(0.2 0.06 280)">📈</div><span class="feat-title">Reports</span></div>
+      <p class="feat-desc">KPI cards, daily activity chart, topic mix pie, accuracy distribution histogram, and conversion funnel — all from /admin/reports/* endpoints.</p>
+      <span class="feat-tag" style="background:oklch(0.18 0.06 280);color:#a78bfa">analytics</span>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════
+     CONTENT FLOW
+══════════════════════════════════════════════════════════════ -->
+<section class="section" id="sec-content">
+  <div class="section-head">
+    <p class="section-eyebrow" style="color:var(--content)">Workflow · Content</p>
+    <h1 class="section-title" style="color:var(--content)">Content Pipeline</h1>
+    <p class="section-desc">How vocabulary and listening content flows from raw files into published modules learners can take.</p>
+  </div>
+
+  <div class="flow-canvas">
+    <svg class="flow-svg" viewBox="0 0 960 440" xmlns="http://www.w3.org/2000/svg">
+      <!-- Document path -->
+      <text style="font-family:'DM Mono',monospace;font-size:10px;fill:#f59e0b;letter-spacing:0.08em" x="40" y="30">DOCUMENT PATH</text>
+
+      <g class="node-group" transform="translate(40,44)">
+        <rect class="node-rect" width="120" height="56" style="stroke:#f59e0b" />
+        <text class="node-icon" x="60" y="20">📄</text>
+        <text class="node-label" x="60" y="36">Upload File</text>
+        <text class="node-sub" x="60" y="50" style="font-size:9px">PDF / DOCX / TXT</text>
+      </g>
+      <path class="arrow" d="M160,72 L200,72" />
+
+      <g class="node-group" transform="translate(200,44)">
+        <rect class="node-rect" width="130" height="56" />
+        <text class="node-icon" x="65" y="20">🤖</text>
+        <text class="node-label" x="65" y="36">AI Extract</text>
+        <text class="node-sub" x="65" y="50" style="font-size:9px">word–definition pairs</text>
+      </g>
+      <path class="arrow" d="M330,72 L370,72" />
+
+      <g class="node-group" transform="translate(370,44)">
+        <rect class="node-rect" width="130" height="56" />
+        <text class="node-icon" x="65" y="20">❓</text>
+        <text class="node-label" x="65" y="36">Auto-Gen Qs</text>
+        <text class="node-sub" x="65" y="50" style="font-size:9px">choice · fill · match</text>
+      </g>
+      <path class="arrow" d="M500,72 L540,72" />
+
+      <g class="node-group" transform="translate(540,44)">
+        <rect class="node-rect" width="130" height="56" style="stroke:#f59e0b" />
+        <text class="node-icon" x="65" y="20">✏️</text>
+        <text class="node-label" x="65" y="36">Review & Edit</text>
+        <text class="node-sub" x="65" y="50" style="font-size:9px">admin finalizes</text>
+      </g>
+      <path class="arrow" d="M670,72 L710,72" />
+
+      <g class="node-group" transform="translate(710,44)">
+        <rect class="node-rect" width="120" height="56" style="stroke:#34d399" />
+        <text class="node-icon" x="60" y="20">🚀</text>
+        <text class="node-label" x="60" y="36">Publish</text>
+        <text class="node-sub" x="60" y="50" style="font-size:9px">status → published</text>
+      </g>
+
+      <!-- Audio path -->
+      <text style="font-family:'DM Mono',monospace;font-size:10px;fill:#60a5fa;letter-spacing:0.08em" x="40" y="160">AUDIO PATH</text>
+
+      <g class="node-group" transform="translate(40,174)">
+        <rect class="node-rect" width="120" height="56" style="stroke:#60a5fa" />
+        <text class="node-icon" x="60" y="20">🎵</text>
+        <text class="node-label" x="60" y="36">Upload Audio</text>
+        <text class="node-sub" x="60" y="50" style="font-size:9px">MP3 / WAV / M4A</text>
+      </g>
+      <path class="arrow" d="M160,202 L200,202" />
+
+      <g class="node-group" transform="translate(200,174)">
+        <rect class="node-rect" width="130" height="56" />
+        <text class="node-icon" x="65" y="20">🗣</text>
+        <text class="node-label" x="65" y="36">Whisper.cpp</text>
+        <text class="node-sub" x="65" y="50" style="font-size:9px">transcribe locally</text>
+      </g>
+      <path class="arrow" d="M330,202 L370,202" />
+
+      <g class="node-group" transform="translate(370,174)">
+        <rect class="node-rect" width="130" height="56" />
+        <text class="node-icon" x="65" y="20">🧠</text>
+        <text class="node-label" x="65" y="36">Qwen2-1.5B</text>
+        <text class="node-sub" x="65" y="50" style="font-size:9px">gen comprehension Qs</text>
+      </g>
+      <path class="arrow" d="M500,202 L540,202" />
+
+      <g class="node-group" transform="translate(540,174)">
+        <rect class="node-rect" width="130" height="56" style="stroke:#60a5fa" />
+        <text class="node-icon" x="65" y="20">✏️</text>
+        <text class="node-label" x="65" y="36">Review Transcript</text>
+        <text class="node-sub" x="65" y="50" style="font-size:9px">fix mishearings</text>
+      </g>
+      <path class="arrow" d="M670,202 L710,202" />
+
+      <g class="node-group" transform="translate(710,174)">
+        <rect class="node-rect" width="120" height="56" style="stroke:#34d399" />
+        <text class="node-icon" x="60" y="20">🚀</text>
+        <text class="node-label" x="60" y="36">Publish</text>
+        <text class="node-sub" x="60" y="50" style="font-size:9px">audio_blob stored</text>
+      </g>
+
+      <!-- Converge: Both publish → Settings → Assign -->
+      <path class="arrow" d="M770,100 L840,100 L840,290 L730,290" />
+      <path class="arrow" d="M770,202 L840,202" style="stroke-dasharray:4,3" />
+
+      <g class="node-group" transform="translate(600,270)">
+        <rect class="node-rect" width="130" height="56" style="stroke:#a78bfa" />
+        <text class="node-icon" x="65" y="20">⚙️</text>
+        <text class="node-label" x="65" y="36">Set Deadline</text>
+        <text class="node-sub" x="65" y="50" style="font-size:9px">+ live_feedback flag</text>
+      </g>
+      <path class="arrow" d="M600,298 L530,298" />
+
+      <g class="node-group" transform="translate(400,270)">
+        <rect class="node-rect" width="130" height="56" />
+        <text class="node-icon" x="65" y="20">📌</text>
+        <text class="node-label" x="65" y="36">Assign Learners</text>
+        <text class="node-sub" x="65" y="50" style="font-size:9px">course / direct</text>
+      </g>
+      <path class="arrow" d="M400,298 L330,298" />
+
+      <g class="node-group" transform="translate(200,270)">
+        <rect class="node-rect" width="130" height="56" style="stroke:#34d399" />
+        <text class="node-icon" x="65" y="20">✅</text>
+        <text class="node-label" x="65" y="36">Live in Library</text>
+        <text class="node-sub" x="65" y="50" style="font-size:9px">learners can take it</text>
+      </g>
+
+      <!-- Worker note -->
+      <g transform="translate(40,310)">
+        <rect width="130" height="80" rx="10" style="fill:#141720;stroke:#252a36;stroke-width:1" />
+        <text style="font-family:'DM Mono',monospace;font-size:9px;fill:#4a5268;text-anchor:middle" x="65" y="16">worker container</text>
+        <text style="font-size:10px;fill:#8890a4;text-anchor:middle" x="65" y="32">whisper.cpp</text>
+        <text style="font-size:10px;fill:#8890a4;text-anchor:middle" x="65" y="48">Qwen2-1.5B GGUF</text>
+        <text style="font-size:9px;fill:#4a5268;text-anchor:middle" x="65" y="64">~2GB · cached</text>
+      </g>
+    </svg>
+  </div>
+
+  <div class="feat-grid">
+    <div class="feat-card">
+      <div class="feat-card-head"><div class="feat-icon" style="background:oklch(0.22 0.07 65)">📄</div><span class="feat-title">Document Import</span></div>
+      <p class="feat-desc">Drop a PDF, DOCX, or TXT file. The AI extracts word–definition pairs and auto-generates multiple-choice, fill-in-blank, and match-pairs questions.</p>
+      <span class="feat-tag" style="background:oklch(0.18 0.07 65);color:#f59e0b">PDF · DOCX · TXT</span>
+    </div>
+    <div class="feat-card">
+      <div class="feat-card-head"><div class="feat-icon" style="background:oklch(0.2 0.06 220)">🎵</div><span class="feat-title">Audio Import</span></div>
+      <p class="feat-desc">whisper.cpp transcribes audio locally (no cloud). Qwen2-1.5B generates comprehension questions from the transcript. First run downloads ~2GB of weights.</p>
+      <span class="feat-tag" style="background:oklch(0.18 0.06 220);color:#60a5fa">local AI</span>
+    </div>
+    <div class="feat-card">
+      <div class="feat-card-head"><div class="feat-icon" style="background:oklch(0.2 0.06 280)">📁</div><span class="feat-title">Example Files</span></div>
+      <p class="feat-desc">apps/api/examples/ has sample-vocabulary.txt and sample-vocabulary.csv showing expected import formats. Drop them in Admin → Import Document to test.</p>
+      <span class="feat-tag" style="background:oklch(0.18 0.06 280);color:#a78bfa">templates</span>
+    </div>
+  </div>
+</section>
+
+<script>
+  const tabs = document.querySelectorAll('.nav-tab');
+  const sections = { learner: 'sec-learner', admin: 'sec-admin', content: 'sec-content' };
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', (e) => {
+      e.preventDefault();
+      tabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const key = tab.dataset.tab;
+      Object.values(sections).forEach(id => {
+        document.getElementById(id)?.classList.remove('visible');
+      });
+      document.getElementById(sections[key])?.classList.add('visible');
+    });
+  });
+</script>
+</body>
+</html>

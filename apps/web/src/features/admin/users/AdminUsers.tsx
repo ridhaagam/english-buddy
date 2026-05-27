@@ -152,6 +152,11 @@ function LearnersTab() {
     mutationFn: (id: string) => api.admin.users.deleteLearner(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-learners"] }),
   });
+  const patchCamera = useMutation({
+    mutationFn: ({ id, require_camera }: { id: string; require_camera: boolean }) =>
+      api.admin.users.patchLearner(id, { require_camera }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-learners"] }),
+  });
 
   return (
     <>
@@ -173,7 +178,7 @@ function LearnersTab() {
         <table className="adm-table" style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ borderBottom: "1px solid var(--line)" }}>
-              {["Name", "Email", "Sessions", "Last active", "Avg score", ""].map((h) => (
+              {["Name", "Email", "Sessions", "Last active", "Avg score", "Camera", ""].map((h) => (
                 <th key={h} style={thStyle}>{h}</th>
               ))}
             </tr>
@@ -193,6 +198,15 @@ function LearnersTab() {
                     : <span style={{ color: "var(--ink-3)" }}>—</span>
                   }
                 </td>
+                <td data-label="Camera" style={tdStyle}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }} title={u.require_camera ? "Camera required — click to make optional" : "Camera optional — click to require"}>
+                    <input type="checkbox" checked={!!u.require_camera}
+                      onChange={(e) => patchCamera.mutate({ id: u.id, require_camera: e.target.checked })} />
+                    <span style={{ fontSize: 12, color: u.require_camera ? "var(--ink)" : "var(--ink-3)" }}>
+                      {u.require_camera ? "Required" : "Optional"}
+                    </span>
+                  </label>
+                </td>
                 <td style={{ ...tdStyle, textAlign: "right" }}>
                   <button className="icon-btn" onClick={() => { if (confirm(`Delete ${u.display_name}?`)) del.mutate(u.id); }}>
                     <TrashIcon size={14} />
@@ -201,7 +215,7 @@ function LearnersTab() {
               </tr>
             ))}
             {learners.length === 0 && !isLoading && (
-              <tr><td colSpan={6} style={{ ...tdStyle, textAlign: "center", color: "var(--ink-3)" }}>
+              <tr><td colSpan={7} style={{ ...tdStyle, textAlign: "center", color: "var(--ink-3)" }}>
                 {search ? `No learners matching "${search}".` : "No learners yet."}
               </td></tr>
             )}

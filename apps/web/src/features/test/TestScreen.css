@@ -22,8 +22,10 @@
         .explain-box { background:oklch(0.97 0.01 240); border:1px solid oklch(0.88 0.03 240); border-radius:var(--r-md); padding:16px 18px; margin-bottom:20px; }
         .explain-text { font-size:13px; color:var(--ink-2); line-height:1.75; white-space:pre-wrap; margin:0; }
         .choice-label { flex:1; font-weight:500; font-size:15px; line-height:1.4; }
-        .fill-input { width:100%; padding:14px 16px; border:1.5px solid var(--line); border-radius:var(--r-md); font-size:16px; background:var(--bg); color:var(--ink); margin-bottom:24px; box-sizing:border-box; }
+        .fill-input { width:100%; padding:14px 16px; border:1.5px solid var(--line); border-radius:var(--r-md); font-size:16px; background:var(--bg); color:var(--ink); margin-bottom:8px; box-sizing:border-box; }
         .fill-input:focus { outline:none; border-color:var(--accent); }
+        .dictation-input-wrap { margin-bottom:20px; }
+        .dictation-hint { color:var(--ink-3); font-size:11px; margin:0 0 16px; }
         .match-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:0 0 24px; }
         .match-col { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:8px; }
         .match-col-head { padding:0 4px 2px; font-size:10px; }
@@ -38,7 +40,11 @@
         .q-footer { margin-top:auto; padding-top:18px; display:flex; justify-content:flex-end; }
         .q-submit { min-width:200px; justify-content:center; }
         .camera-pane { position:sticky; top:80px; }
-        @media(max-width:960px) { .test-main{grid-template-columns:1fr;padding:16px} .camera-pane{position:static;order:-1} .q-pane{padding:24px 20px} }
+        @media(max-width:960px) { .test-main{grid-template-columns:1fr;padding:16px} .camera-pane{position:static} .q-pane{padding:24px 20px} }
+        /* On tablet (641-960px): question first, camera below */
+        @media(min-width:641px) and (max-width:960px) { .camera-pane{order:1;margin-top:0} .q-pane{order:0} }
+        /* On phone (≤640px): camera consent above question so user addresses it first */
+        @media(max-width:640px) { .camera-pane{order:-1} }
         @media(max-width:520px) { .test-head{padding:10px 14px;gap:10px} .q-prompt{font-size:22px} .q-pane{padding:20px 16px;border-radius:var(--r-lg)} .match-grid{grid-template-columns:1fr} .q-submit{width:100%;justify-content:center} }
 
       .cam-card { background:var(--surface); border:1px solid var(--line); border-radius:var(--r-xl); box-shadow:var(--shadow-sm); padding:18px; display:flex; flex-direction:column; gap:12px; }

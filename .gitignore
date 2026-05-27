@@ -66,7 +66,7 @@ index.html
 vocabulary.pdf
 30_days_english.html
 styles.css
-src/
+/src/
 
 # Local development seed scripts (contain personal data)
 apps/api/seed_dewi.py

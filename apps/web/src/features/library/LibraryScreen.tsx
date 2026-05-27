@@ -19,10 +19,14 @@ export function LibraryScreen({ onStartTest }: Props) {
     vocabulary: "158", grammar: "65", listening: "220", speaking: "25", writing: "300",
   };
 
+  // Separate exam modules from regular practice modules
+  const examModules = useMemo(() => (library as any[]).filter((m: any) => m.is_exam), [library]);
+  const practiceLibrary = useMemo(() => (library as any[]).filter((m: any) => !m.is_exam), [library]);
+
   // Group modules by course; modules with no course go into "Other"
   const groups = useMemo(() => {
     const map = new Map<string, { id: string | null; title: string; modules: any[] }>();
-    for (const m of library as any[]) {
+    for (const m of practiceLibrary as any[]) {
       const key = m.course_id ?? "__other__";
       if (!map.has(key)) {
         map.set(key, { id: m.course_id ?? null, title: m.course_title ?? "Other", modules: [] });
@@ -39,7 +43,7 @@ export function LibraryScreen({ onStartTest }: Props) {
     return entries;
   }, [library]);
 
-  const isEmpty = (library as any[]).length === 0;
+  const isEmpty = (library as any[]).length === 0 && examModules.length === 0;
   const avgHigh = (library as any[]).filter((x: any) => x.high_score !== null).length
     ? Math.round((library as any[]).filter((x: any) => x.high_score !== null).reduce((a: number, b: any) => a + (b.high_score || 0), 0) / (library as any[]).filter((x: any) => x.high_score !== null).length)
     : 0;
@@ -75,6 +79,64 @@ export function LibraryScreen({ onStartTest }: Props) {
           <LayersIcon size={40} />
           <p className="serif" style={{ fontSize: 20, marginTop: 16 }}>No modules available yet.</p>
           <p style={{ fontSize: 14, color: "var(--ink-3)", marginTop: 4 }}>Your instructor will assign modules to you soon.</p>
+        </div>
+      )}
+
+      {/* Exam Corner — timed exams shown before regular practice modules */}
+      {examModules.length > 0 && (
+        <div style={{ marginBottom: 36 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+            <span style={{ fontSize: 20 }}>🎓</span>
+            <h2 className="serif" style={{ margin: 0, fontSize: 22, letterSpacing: "-0.015em" }}>Exam Corner</h2>
+            <span className="mono" style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 2 }}>
+              {examModules.length} exam{examModules.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+          <ul className="lib-grid">
+            {examModules.map((it: any, i: number) => {
+              const c = topicColors[it.topic] || "158";
+              return (
+                <li key={it.id} className="lib-tile fade-up" style={{ animationDelay: `${180 + i * 50}ms`, ["--c" as any]: c, borderColor: "oklch(0.85 0.07 55)", background: "oklch(0.985 0.015 55)" }}>
+                  <div className="tile-top">
+                    <div className="tile-glyph" aria-hidden="true"><ModuleGlyph topic={it.topic} /></div>
+                    <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                      <span className="mono" style={{ fontSize: 9, padding: "2px 6px", borderRadius: 999, background: "oklch(0.93 0.08 55)", color: "oklch(0.45 0.12 55)", border: "1px solid oklch(0.85 0.08 55)", fontWeight: 700 }}>EXAM</span>
+                      <span className="tile-level mono">{it.cefr_level}</span>
+                    </div>
+                  </div>
+                  <div className="tile-body">
+                    <span className="eyebrow" style={{ textTransform: "capitalize" }}>{it.topic}</span>
+                    <h3 className="serif" style={{ margin: "4px 0 10px", fontSize: 19 }}>{it.title}</h3>
+                    <div className="tile-meta mono">
+                      <span>{it.questions_count} questions</span>
+                      <span className="dot-sep" />
+                      <span>{it.my_attempts} attempt{it.my_attempts !== 1 ? "s" : ""}</span>
+                    </div>
+                  </div>
+                  <div className="tile-score">
+                    {it.high_score !== null ? (
+                      <>
+                        <div className="hs">
+                          <span className="eyebrow">Score</span>
+                          <span className="hs-val serif">{it.high_score}%</span>
+                        </div>
+                        <ProgressBar value={(it.high_score || 0) / 100} />
+                      </>
+                    ) : (
+                      <div className="hs-empty">
+                        <span className="eyebrow">Not attempted</span>
+                        <p className="mono" style={{ margin: 0, fontSize: 11, color: "var(--ink-3)" }}>Results hidden until revealed</p>
+                      </div>
+                    )}
+                  </div>
+                  <button className="btn ghost tile-action" style={{ borderColor: "oklch(0.78 0.1 55)", color: "oklch(0.45 0.12 55)" }} onClick={() => onStartTest(it.id)}>
+                    {it.my_attempts > 0 ? "Retake exam" : "Start exam"}
+                    <ArrowRightIcon size={14} />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
         </div>
       )}
 

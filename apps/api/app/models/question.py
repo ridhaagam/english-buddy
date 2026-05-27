@@ -14,6 +14,7 @@ class QuestionKind(str, enum.Enum):
     fill = "fill"
     match = "match"
     listen_choice = "listen_choice"
+    dictation = "dictation"
 
 
 class Question(Base):

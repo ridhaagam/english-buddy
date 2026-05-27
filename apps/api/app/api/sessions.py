@@ -170,8 +170,10 @@ async def my_sessions(
             revealed = now >= m.reveal_at
         elif m.show_answers_after_deadline and m.deadline:
             revealed = now >= m.deadline
+        elif m.is_exam:
+            revealed = False  # exam: hidden until reveal_at is explicitly set
         else:
-            revealed = False
+            revealed = True  # regular practice: always reveal
         out.append({
             "id": str(s.id),
             "module_id": str(s.module_id),
@@ -290,11 +292,12 @@ async def get_my_session(
     mod_r = await db.execute(select(Module).where(Module.id == session.module_id))
     module = mod_r.scalar_one_or_none()
 
-    # Answers are hidden by default; only revealed when a past trigger exists.
-    # Revealed when:
-    #   a) reveal_at is set and has already passed
-    #   b) show_answers_after_deadline=True and deadline is set and has passed
-    answers_revealed = False
+    # Answers are revealed by default for practice modules. Gated when:
+    #   a) is_exam=True and no reveal_at set → hidden until admin explicitly sets reveal_at
+    #   b) reveal_at is set → revealed when that time has passed
+    #   c) show_answers_after_deadline=True + deadline → revealed when deadline passed
+    #   d) None of the above → reveal immediately (regular practice modules)
+    answers_revealed = True
     effective_reveal_at = None
     if module:
         if module.reveal_at:
@@ -303,6 +306,9 @@ async def get_my_session(
         elif module.show_answers_after_deadline and module.deadline:
             effective_reveal_at = module.deadline
             answers_revealed = datetime.now(timezone.utc) >= module.deadline
+        elif module.is_exam:
+            # Exam with no explicit reveal date: hide answers until admin sets one
+            answers_revealed = False
 
     ans_r = await db.execute(
         select(SessionAnswer).where(SessionAnswer.session_id == session_id)
@@ -382,6 +388,9 @@ async def submit_answer(
         is_correct = all(
             body.selection.get(p["left"]) == p["right"] for p in pairs
         ) if pairs else False
+    elif question.kind.value == "dictation":
+        typed = body.selection.get("text", "").strip().lower()
+        is_correct = typed == correct_answer.strip().lower()
     else:
         is_correct = body.selection.get("choice") == correct_answer
 
@@ -468,12 +477,14 @@ async def finish_session(
 
     mod_r = await db.execute(select(Module).where(Module.id == session.module_id))
     module = mod_r.scalar_one_or_none()
-    answers_revealed = False
+    answers_revealed = True  # default: reveal for regular practice
     if module:
         if module.reveal_at:
             answers_revealed = datetime.now(timezone.utc) >= module.reveal_at
         elif module.show_answers_after_deadline and module.deadline:
             answers_revealed = datetime.now(timezone.utc) >= module.deadline
+        elif module.is_exam:
+            answers_revealed = False  # exam: hidden until reveal_at is set
 
     return {"score_pct": score_pct, "correct_count": correct_count, "total": total, "xp_earned": xp, "answers_revealed": answers_revealed}
 
@@ -646,6 +657,7 @@ async def get_library(
             "last_taken": u.last_taken.isoformat() if u and u.last_taken else None,
             "course_id": course_info.get("course_id"),
             "course_title": course_info.get("course_title"),
+            "is_exam": m.is_exam,
         })
     return out
 
