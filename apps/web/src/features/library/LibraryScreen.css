@@ -3,14 +3,14 @@
         .lib-stats { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
         .lib-stats>div { background:var(--surface); border:1px solid var(--line); border-radius:var(--r-md); padding:14px 16px; display:flex; flex-direction:column; gap:4px; }
         .lib-stats strong { font-size:26px; letter-spacing:-0.02em; }
-        .topic-bar { display:flex; gap:6px; overflow-x:auto; padding:4px 0 18px; scrollbar-width:none; }
+        .topic-bar { display:flex; gap:6px; overflow-x:auto; overflow-y:hidden; padding:4px 0 18px; scrollbar-width:none; }
         .topic-bar::-webkit-scrollbar { display:none; }
         .lib-grid { list-style:none; padding:0; margin:0; display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:14px; }
         .lib-tile { background:var(--surface); border:1px solid var(--line); border-radius:var(--r-xl); padding:18px; display:flex; flex-direction:column; gap:14px; transition:transform 0.2s ease,box-shadow 0.2s ease,border-color 0.2s ease; position:relative; overflow:hidden; }
         .lib-tile::before { content:""; position:absolute; inset:0 0 auto 0; height:4px; background:oklch(0.7 0.14 var(--c)); }
         .lib-tile:hover { transform:translateY(-2px); box-shadow:var(--shadow-md); border-color:oklch(0.7 0.14 var(--c)/0.5); }
         .tile-top { display:flex; align-items:center; justify-content:space-between; }
-        .tile-glyph { width:44px;height:44px; border-radius:12px; background:oklch(0.95 0.04 var(--c)); color:oklch(0.4 0.1 var(--c)); display:grid; place-items:center; }
+        .tile-glyph { width:44px;height:44px; border-radius:12px; background:oklch(0.95 0.04 var(--c)); color:oklch(0.4 0.1 var(--c)); display:grid; place-items:center; flex-shrink:0; }
         .tile-level { font-size:10px; background:var(--bg-2); padding:4px 8px; border-radius:6px; color:var(--ink-3); border:1px solid var(--line); }
         .tile-meta { display:flex; align-items:center; gap:8px; font-size:11px; color:var(--ink-3); }
         .tile-score { display:flex; flex-direction:column; gap:8px; }

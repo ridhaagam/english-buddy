@@ -4,8 +4,8 @@
         .res-top { display:flex; align-items:center; gap:32px; }
         .score-ring-wrap { position:relative; flex-shrink:0; }
         .score-label { position:absolute; top:50%;left:50%; transform:translate(-50%,-50%); display:flex; flex-direction:column; align-items:center; gap:0; }
-        .score-label strong { font-size:28px; letter-spacing:-0.02em; }
-        .score-label .mono { font-size:10px; color:var(--ink-3); }
+        .score-label strong { font-size:28px; letter-spacing:-0.02em; line-height:1; display:block; }
+        .score-label .mono { font-size:10px; color:var(--ink-3); line-height:1; display:block; }
         .res-headline { flex:1; }
         .res-chips { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
         .chip { background:var(--bg-2); border:1px solid var(--line); border-radius:var(--r-md); padding:14px 16px; display:flex; flex-direction:column; gap:4px; }
@@ -19,7 +19,7 @@
         .ans-icon { width:24px;height:24px; border-radius:50%; display:grid; place-items:center; flex-shrink:0; }
         .ans-icon.correct { background:var(--accent-soft); color:var(--accent-ink); }
         .ans-icon.wrong { background:oklch(0.95 0.04 25); color:oklch(0.5 0.1 25); }
-        .ans-verdict { font-size:11px; letter-spacing:.04em; padding:3px 8px; border-radius:999px; }
+        .ans-verdict { font-size:11px; letter-spacing:.04em; padding:3px 8px; border-radius:999px; flex-shrink:0; white-space:nowrap; }
         .v-correct { background:var(--accent-soft); color:var(--accent-ink); }
         .v-wrong { background:oklch(0.95 0.04 25); color:oklch(0.5 0.1 25); }
         .ans-choices { display:flex; flex-direction:column; gap:4px; padding:10px 12px; background:var(--surface); }

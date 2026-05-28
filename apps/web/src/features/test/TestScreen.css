@@ -45,7 +45,7 @@
         @media(min-width:641px) and (max-width:960px) { .camera-pane{order:1;margin-top:0} .q-pane{order:0} }
         /* On phone (≤640px): camera consent above question so user addresses it first */
         @media(max-width:640px) { .camera-pane{order:-1} }
-        @media(max-width:520px) { .test-head{padding:10px 14px;gap:10px} .q-prompt{font-size:22px} .q-pane{padding:20px 16px;border-radius:var(--r-lg)} .match-grid{grid-template-columns:1fr} .q-submit{width:100%;justify-content:center} }
+        @media(max-width:520px) { .test-head{padding:10px 14px;gap:10px} .q-prompt{font-size:22px} .q-pane{padding:20px 16px;border-radius:var(--r-lg);min-height:0} .match-grid{grid-template-columns:1fr} .q-submit{width:100%;justify-content:center} .match-tag{max-width:none} }
 
       .cam-card { background:var(--surface); border:1px solid var(--line); border-radius:var(--r-xl); box-shadow:var(--shadow-sm); padding:18px; display:flex; flex-direction:column; gap:12px; }
       .cam-head { display:flex; justify-content:space-between; align-items:center; }

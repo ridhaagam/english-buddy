@@ -201,6 +201,7 @@ select {
   padding: 8px 14px; border-radius: 999px;
   font-size: 13px; color: var(--ink-2);
   cursor: pointer; white-space: nowrap;
+  flex-shrink: 0;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 .topic-chip:hover { background: var(--bg-2); color: var(--ink); }

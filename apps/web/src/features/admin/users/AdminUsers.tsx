@@ -74,8 +74,8 @@ function StaffTab() {
           <tbody>
             {(users as any[]).map((u: any) => (
               <tr key={u.id} style={{ borderBottom: "1px solid var(--line-2)" }}>
-                <td data-label="Name" style={tdStyle}><span style={{ fontWeight: 600 }}>{u.display_name}</span></td>
-                <td data-label="Email" style={{ ...tdStyle, color: "var(--ink-2)" }}>{u.email}</td>
+                <td data-label="Name" style={tdStyle}><span className="adm-cell-name">{u.display_name}</span></td>
+                <td data-label="Email" style={{ ...tdStyle, color: "var(--ink-2)" }}><span className="adm-cell-email">{u.email}</span></td>
                 <td data-label="Role" style={tdStyle}>
                   <select className="mono" value={u.role}
                     onChange={(e) => changeRole.mutate({ id: u.id, role: e.target.value })}
@@ -186,8 +186,8 @@ function LearnersTab() {
           <tbody>
             {(learners as any[]).map((u: any) => (
               <tr key={u.id} style={{ borderBottom: "1px solid var(--line-2)" }}>
-                <td data-label="Name" style={tdStyle}><span style={{ fontWeight: 600 }}>{u.display_name}</span></td>
-                <td data-label="Email" style={{ ...tdStyle, color: "var(--ink-2)" }}>{u.email}</td>
+                <td data-label="Name" style={tdStyle}><span className="adm-cell-name">{u.display_name}</span></td>
+                <td data-label="Email" style={{ ...tdStyle, color: "var(--ink-2)" }}><span className="adm-cell-email">{u.email}</span></td>
                 <td data-label="Sessions" style={tdStyle}><span className="mono" style={{ fontSize: 12 }}>{u.total_sessions ?? 0}</span></td>
                 <td data-label="Last active" style={{ ...tdStyle, color: "var(--ink-3)", fontSize: 13 }}>
                   {u.last_seen_at ? new Date(u.last_seen_at).toLocaleDateString() : "Never"}

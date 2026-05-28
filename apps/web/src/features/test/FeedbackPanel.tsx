@@ -126,7 +126,7 @@ function ChoiceExplainCard({
         </span>
       </div>
       {canExpand && (
-        <div className="fp-cc-body" ref={bodyRef} style={{ maxHeight: defaultOpen ? undefined : "0px", overflow: "hidden", transition: "max-height 0.3s ease" }}>
+        <div className="fp-cc-body" ref={bodyRef} style={{ maxHeight: defaultOpen ? undefined : "0px", overflow: "hidden" }}>
           <p className="fp-cc-text">{text}</p>
         </div>
       )}

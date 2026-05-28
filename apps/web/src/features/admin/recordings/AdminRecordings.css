@@ -109,7 +109,7 @@
         .res-q-num { font-family: var(--font-mono); font-size: 10px; color: var(--ink-3); letter-spacing: 0.05em; font-weight: 600; }
         .res-ans-time { font-family: var(--font-mono); font-size: 10px; color: var(--ink-3); margin-left: auto; }
         .res-ans-prompt { margin: 0; font-size: 13px; color: var(--ink); line-height: 1.45; }
-        .res-ans-sel { margin: 4px 0 0; font-size: 12px; font-family: var(--font-mono); }
+        .res-ans-sel { margin: 4px 0 0; font-size: 12px; font-family: var(--font-mono); overflow-wrap: break-word; word-break: break-word; }
         .res-ans-sel.ok { color: oklch(0.5 0.13 158); }
         .res-ans-sel.err { color: oklch(0.5 0.1 25); }
 
@@ -127,6 +127,9 @@
         .res-foot-status { font-size: 13px; color: var(--ink-3); }
 
         /* Responsive */
+        @media (max-width: 1200px) {
+          .res-drawer { width: min(580px, 50vw); }
+        }
         @media (max-width: 860px) {
           .res-drawer { width: min(520px, 92vw); }
         }
