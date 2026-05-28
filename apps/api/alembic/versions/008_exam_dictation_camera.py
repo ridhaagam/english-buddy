@@ -16,7 +16,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Column additions are safe inside the Alembic transaction
+    # ── Column additions (safe inside the Alembic transaction) ───────────────
     op.execute(
         "ALTER TABLE english_users "
         "ADD COLUMN IF NOT EXISTS require_camera BOOLEAN NOT NULL DEFAULT false"
@@ -30,12 +30,12 @@ def upgrade() -> None:
         "ADD COLUMN IF NOT EXISTS exam_duration_minutes INTEGER"
     )
 
-    # ALTER TYPE ADD VALUE cannot run inside a transaction block in PostgreSQL.
-    # Use autocommit mode for this statement only.
-    bind = op.get_bind()
-    bind.execution_options(isolation_level="AUTOCOMMIT").execute(
-        sa.text("ALTER TYPE question_kind ADD VALUE IF NOT EXISTS 'dictation'")
-    )
+    # ── Enum value addition (MUST run outside any transaction in PostgreSQL) ──
+    # autocommit_block() commits the current transaction, switches to autocommit
+    # mode for the block, then starts a new transaction for the rest of the
+    # migration (so alembic_version gets updated correctly).
+    with op.get_context().autocommit_block():
+        op.execute(sa.text("ALTER TYPE question_kind ADD VALUE IF NOT EXISTS 'dictation'"))
 
 
 def downgrade() -> None:
