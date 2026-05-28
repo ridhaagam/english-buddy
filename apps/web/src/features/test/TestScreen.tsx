@@ -424,8 +424,11 @@ export function TestScreen({ moduleId, onExit, onDone, resumeData }: Props) {
             </blockquote>
           )}
 
-          {(q.kind === "listen_choice" || q.kind === "dictation") && module?.audio_blob && (
-            <AudioPlayer src={`/api/v1/modules/${moduleId}/audio`} />
+          {(q.kind === "listen_choice" || q.kind === "dictation") && (
+            <AudioPlayer
+              src={(module as any)?.audio_blob ? `/api/v1/modules/${moduleId}/audio` : undefined}
+              fallbackText={q.kind === "dictation" ? (q.payload?.answer ?? undefined) : undefined}
+            />
           )}
 
           {q.kind === "fill" && q.sentence && (
@@ -604,53 +607,106 @@ export function TestScreen({ moduleId, onExit, onDone, resumeData }: Props) {
 
 // ─── Audio Player ─────────────────────────────────────────────────────────────
 
-function AudioPlayer({ src }: { src: string }) {
+function AudioPlayer({ src, fallbackText }: { src?: string; fallbackText?: string }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [loadError, setLoadError] = useState(false);
 
   const token = localStorage.getItem("access_token");
-  const srcWithToken = token ? `${src}?token=${token}` : src;
+  const srcWithToken = src && token ? `${src}?token=${token}` : src;
+
+  // Use TTS when there's no audio file or the audio file failed to load
+  const useTts = !src || loadError;
+  const ttsAvail = useTts && !!fallbackText && typeof window !== "undefined" && !!window.speechSynthesis;
 
   function toggle() {
+    if (useTts) {
+      if (!ttsAvail) return;
+      if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+        setPlaying(false);
+      } else {
+        const utt = new SpeechSynthesisUtterance(fallbackText!);
+        utt.lang = "en-US";
+        utt.rate = 0.85;
+        utt.onend = () => setPlaying(false);
+        utt.onerror = () => setPlaying(false);
+        window.speechSynthesis.speak(utt);
+        setPlaying(true);
+      }
+      return;
+    }
     const a = audioRef.current;
     if (!a) return;
     if (playing) { a.pause(); } else { a.play(); }
     setPlaying(!playing);
   }
 
+  const playerBase = {
+    display: "flex" as const, alignItems: "center" as const, gap: 12, padding: "14px 16px",
+    background: "var(--accent-soft)", border: "1.5px solid color-mix(in oklch,var(--accent),white 50%)",
+    borderRadius: "var(--r-md)", marginBottom: 20,
+  };
+
+  // No audio and no TTS fallback — show a disabled placeholder
+  if (useTts && !ttsAvail) {
+    return (
+      <div style={{ ...playerBase, opacity: 0.6 }}>
+        <div style={{ width: 38, height: 38, borderRadius: "50%", background: "var(--bg-2)", border: "1px solid var(--line)", display: "grid", placeItems: "center", flexShrink: 0, fontSize: 16, color: "var(--ink-3)" }}>
+          🔇
+        </div>
+        <span style={{ fontSize: 13, color: "var(--ink-3)" }}>No audio attached to this module</span>
+      </div>
+    );
+  }
+
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", background: "var(--accent-soft)", border: "1.5px solid color-mix(in oklch,var(--accent),white 50%)", borderRadius: "var(--r-md)", marginBottom: 20 }}>
-      <audio
-        ref={audioRef}
-        src={srcWithToken}
-        onTimeUpdate={() => {
-          const a = audioRef.current;
-          if (a && a.duration) setProgress(a.currentTime / a.duration);
-        }}
-        onLoadedMetadata={() => setDuration(audioRef.current?.duration ?? 0)}
-        onEnded={() => setPlaying(false)}
-      />
+    <div style={playerBase}>
+      {!useTts && (
+        <audio
+          ref={audioRef}
+          src={srcWithToken}
+          onTimeUpdate={() => {
+            const a = audioRef.current;
+            if (a && a.duration) setProgress(a.currentTime / a.duration);
+          }}
+          onLoadedMetadata={() => setDuration(audioRef.current?.duration ?? 0)}
+          onEnded={() => setPlaying(false)}
+          onError={() => setLoadError(true)}
+        />
+      )}
       <button
         onClick={toggle}
         style={{
           width: 38, height: 38, borderRadius: "50%", background: "var(--accent)", color: "white",
           border: "none", cursor: "pointer", display: "grid", placeItems: "center", flexShrink: 0,
-          fontSize: 14,
+          fontSize: 16, transition: "transform 0.15s ease, opacity 0.15s ease",
         }}
+        aria-label={playing ? "Pause" : "Play"}
       >
         {playing ? "⏸" : "▶"}
       </button>
       <div style={{ flex: 1 }}>
-        <div style={{ height: 4, background: "color-mix(in oklch,var(--accent),white 60%)", borderRadius: 999, overflow: "hidden" }}>
-          <div style={{ height: "100%", width: `${progress * 100}%`, background: "var(--accent)", borderRadius: 999, transition: "width 0.2s linear" }} />
-        </div>
-        <div style={{ fontSize: 11, color: "var(--accent-ink)", marginTop: 4, fontVariantNumeric: "tabular-nums" }}>
-          {duration > 0 ? `${formatTime(progress * duration * 1000)} / ${formatTime(duration * 1000)}` : "Loading audio…"}
-        </div>
+        {useTts ? (
+          <div style={{ fontSize: 13, color: "var(--accent-ink)", lineHeight: 1.4 }}>
+            {playing ? "Speaking… (click to stop)" : "Click ▶ to hear the sentence"}
+          </div>
+        ) : (
+          <>
+            <div style={{ height: 4, background: "color-mix(in oklch,var(--accent),white 60%)", borderRadius: 999, overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${progress * 100}%`, background: "var(--accent)", borderRadius: 999, transition: "width 0.2s linear" }} />
+            </div>
+            <div style={{ fontSize: 11, color: "var(--accent-ink)", marginTop: 4, fontVariantNumeric: "tabular-nums" }}>
+              {duration > 0 ? `${formatTime(progress * duration * 1000)} / ${formatTime(duration * 1000)}` : "Loading audio…"}
+            </div>
+          </>
+        )}
       </div>
-      <span className="mono" style={{ fontSize: 10, color: "var(--accent-ink)" }}>AUDIO</span>
+      <span className="mono" style={{ fontSize: 10, color: "var(--accent-ink)" }}>
+        {useTts ? "TTS" : "AUDIO"}
+      </span>
     </div>
   );
 }
