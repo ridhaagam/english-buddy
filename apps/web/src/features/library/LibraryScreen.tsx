@@ -19,6 +19,12 @@ export function LibraryScreen({ onStartTest }: Props) {
     vocabulary: "158", grammar: "65", listening: "220", speaking: "25", writing: "300",
   };
 
+  const isModuleClosed = (m: any): boolean => {
+    if (m.is_closed) return true;
+    if (m.deadline && new Date(m.deadline) < new Date()) return true;
+    return false;
+  };
+
   // Separate exam modules from regular practice modules
   const examModules = useMemo(() => (library as any[]).filter((m: any) => m.is_exam), [library]);
   const practiceLibrary = useMemo(() => (library as any[]).filter((m: any) => !m.is_exam), [library]);
@@ -95,12 +101,14 @@ export function LibraryScreen({ onStartTest }: Props) {
           <ul className="lib-grid">
             {examModules.map((it: any, i: number) => {
               const c = topicColors[it.topic] || "158";
+              const closed = isModuleClosed(it);
               return (
-                <li key={it.id} className="lib-tile fade-up" style={{ animationDelay: `${180 + i * 50}ms`, ["--c" as any]: c, borderColor: "oklch(0.85 0.07 55)", background: "oklch(0.985 0.015 55)" }}>
+                <li key={it.id} className={`lib-tile fade-up${closed ? " lib-tile-closed" : ""}`} style={{ animationDelay: `${180 + i * 50}ms`, ["--c" as any]: c, borderColor: "oklch(0.85 0.07 55)", background: "oklch(0.985 0.015 55)" }}>
                   <div className="tile-top">
                     <div className="tile-glyph" aria-hidden="true"><ModuleGlyph topic={it.topic} /></div>
                     <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
                       <span className="mono" style={{ fontSize: 9, padding: "2px 6px", borderRadius: 999, background: "oklch(0.93 0.08 55)", color: "oklch(0.45 0.12 55)", border: "1px solid oklch(0.85 0.08 55)", fontWeight: 700 }}>EXAM</span>
+                      {closed && <span className="tile-closed-badge mono">CLOSED</span>}
                       <span className="tile-level mono">{it.cefr_level}</span>
                     </div>
                   </div>
@@ -129,10 +137,16 @@ export function LibraryScreen({ onStartTest }: Props) {
                       </div>
                     )}
                   </div>
-                  <button className="btn ghost tile-action" style={{ borderColor: "oklch(0.78 0.1 55)", color: "oklch(0.45 0.12 55)" }} onClick={() => onStartTest(it.id)}>
-                    {it.my_attempts > 0 ? "Retake exam" : "Start exam"}
-                    <ArrowRightIcon size={14} />
-                  </button>
+                  {closed ? (
+                    <button className="btn ghost tile-action" disabled>
+                      Module closed
+                    </button>
+                  ) : (
+                    <button className="btn ghost tile-action" style={{ borderColor: "oklch(0.78 0.1 55)", color: "oklch(0.45 0.12 55)" }} onClick={() => onStartTest(it.id)}>
+                      {it.my_attempts > 0 ? "Retake exam" : "Start exam"}
+                      <ArrowRightIcon size={14} />
+                    </button>
+                  )}
                 </li>
               );
             })}
@@ -155,11 +169,15 @@ export function LibraryScreen({ onStartTest }: Props) {
           <ul className="lib-grid">
             {group.modules.map((it: any, i: number) => {
               const c = topicColors[it.topic] || "158";
+              const closed = isModuleClosed(it);
               return (
-                <li key={it.id} className="lib-tile fade-up" style={{ animationDelay: `${180 + i * 50}ms`, ["--c" as any]: c }}>
+                <li key={it.id} className={`lib-tile fade-up${closed ? " lib-tile-closed" : ""}`} style={{ animationDelay: `${180 + i * 50}ms`, ["--c" as any]: c }}>
                   <div className="tile-top">
                     <div className="tile-glyph" aria-hidden="true"><ModuleGlyph topic={it.topic} /></div>
-                    <span className="tile-level mono">{it.cefr_level}</span>
+                    <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                      {closed && <span className="tile-closed-badge mono">CLOSED</span>}
+                      <span className="tile-level mono">{it.cefr_level}</span>
+                    </div>
                   </div>
                   <div className="tile-body">
                     <span className="eyebrow" style={{ textTransform: "capitalize" }}>{it.topic}</span>
@@ -186,10 +204,16 @@ export function LibraryScreen({ onStartTest }: Props) {
                       </div>
                     )}
                   </div>
-                  <button className="btn ghost tile-action" onClick={() => onStartTest(it.id)}>
-                    {it.high_score !== null ? "Practice again" : "Start practice"}
-                    <ArrowRightIcon size={14} />
-                  </button>
+                  {closed ? (
+                    <button className="btn ghost tile-action" disabled>
+                      Module closed
+                    </button>
+                  ) : (
+                    <button className="btn ghost tile-action" onClick={() => onStartTest(it.id)}>
+                      {it.high_score !== null ? "Practice again" : "Start practice"}
+                      <ArrowRightIcon size={14} />
+                    </button>
+                  )}
                 </li>
               );
             })}

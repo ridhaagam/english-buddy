@@ -658,6 +658,9 @@ async def get_library(
             "course_id": course_info.get("course_id"),
             "course_title": course_info.get("course_title"),
             "is_exam": m.is_exam,
+            "is_closed": m.is_closed,
+            "deadline": m.deadline.isoformat() if m.deadline else None,
+            "max_attempts": m.max_attempts,
         })
     return out
 

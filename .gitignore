@@ -70,4 +70,7 @@ styles.css
 
 # Local development seed scripts (contain personal data)
 apps/api/seed_dewi.py
+apps/api/seed_gery_week.py
+apps/api/seed_gery_audio.py
+apps/api/seed_gery_modules.py
 apps/api/update_explains.py
