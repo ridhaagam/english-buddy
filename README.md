@@ -14,17 +14,20 @@
 
 **For learners**
 - Library shows only the modules assigned to you, grouped by course
-- Pick a module and take a 10-minute session — timed, scored, and recorded (with consent)
+- Five question types: MCQ, fill-in-the-blank, matching, **dictation** (listen → type), and **listening comprehension** (audio + MCQ)
+- **Exam Corner** — timed exams with a countdown, results held until the admin-set deadline
 - Resume interrupted sessions — the app remembers exactly which questions you've answered
+- Bilingual (EN/ID) answer-reveal panel after each question when live feedback is enabled
 - Streak tracking, XP, and a daily-goal ring keep progress visible without being noisy
 - Results show per-question breakdowns — what you got right, how long each answer took
 
 **For admins**
 - Create **courses** (named groups of modules) and enroll specific learners per course
 - Assign individual modules directly to learners when a full course isn't needed
-- Set **deadlines** and **max attempts** per module; close a module instantly with a toggle
+- Set **deadlines**, **max attempts**, and **exam mode** per module; close a module instantly with a toggle
+- Toggle **camera requirement** per learner — users with the flag must record during sessions
 - Drop a PDF or Word vocabulary list — the app extracts words and auto-generates MCQ and match questions
-- Upload audio for listening modules — whisper.cpp transcribes locally, a quantized Qwen LLM drafts comprehension questions
+- Upload audio for listening/dictation modules — whisper.cpp transcribes locally, Qwen LLM drafts questions
 - Review session recordings with a per-question answer overlay, flag anything suspicious, export to CSV
 
 ---
@@ -141,10 +144,10 @@ The AI models run in the `worker` container. First run downloads weights — thi
 
 ## System flow diagrams
 
-After starting the app, open **http://localhost:5173/flows.html** in a browser to see:
+After starting the app, open **http://localhost:5173/flows.html** in a browser to see interactive flow diagrams:
 
-- **Learner flow** — login → library → exam vs practice → test → results
-- **Admin flow** — module creation, course enrollment, recording review
+- **Learner flow** — login → library → exam corner vs practice → dictation/listening/MCQ test → results
+- **Admin flow** — module creation (including exam/dictation/listening types), course enrollment, camera settings, recording review
 - **Content pipeline** — PDF/audio import through whisper and Qwen to published module
 
 The diagrams are static HTML (no server needed) and live at `apps/web/public/flows.html`.
