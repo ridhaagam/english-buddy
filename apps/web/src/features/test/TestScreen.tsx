@@ -264,7 +264,7 @@ export function TestScreen({ moduleId, onExit, onDone, resumeData }: Props) {
         module_id: moduleId,
         answers: answersRef.current,
         timeMs: Date.now() - startRef.current,
-        answers_revealed: (result as any).answers_revealed ?? true,
+        answers_revealed: (result as any).answers_revealed ?? false,
       });
     } catch {
       if (camRef.current) await camRef.current.stopAndUpload(sessionId!).catch(() => {});

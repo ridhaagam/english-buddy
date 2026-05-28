@@ -163,15 +163,16 @@ export function FeedbackPanel({
 
   const correctChoice = choices.find((c) => c.id === correctId);
   const chosenChoice = choices.find((c) => c.id === chosenId);
-  const correctLetter = String.fromCharCode(65 + choices.findIndex((c) => c.id === correctId));
 
   // Fallback: if no structured sections found (simple bilingual explain),
-  // show it under the correct choice
+  // show it under the correct choice (MCQ) or as a standalone block (dictation).
   const hasSections = sections.length > 0;
   let fallbackSection: ExplainSection | null = null;
-  if (!hasSections && explain && correctChoice) {
+  if (!hasSections && explain) {
     const { en, id } = splitBilingual(explain);
-    fallbackSection = { choiceLabel: correctChoice.label, type: "correct", en, id };
+    // For MCQ: attach to the correct choice card; for dictation: use correctId as label
+    const label = correctChoice?.label ?? correctId;
+    fallbackSection = { choiceLabel: label, type: "correct", en, id };
   }
 
   return (
@@ -197,7 +198,7 @@ export function FeedbackPanel({
                 : `Jawaban benar: ${choices.length > 0 ? (correctChoice?.label ?? "") : correctId}`}
             </span>
           </div>
-          {isCorrect && <div className="fp-xp-badge">+10 XP</div>}
+          {isCorrect && <div className="fp-xp-badge">+40 XP</div>}
         </div>
 
         {/* ── Language toggle ── */}
@@ -218,53 +219,62 @@ export function FeedbackPanel({
           </div>
         )}
 
-        {/* ── Interactive choice cards ── */}
-        <div className="fp-choice-cards">
-          {choices.map((c, i) => {
-            const letter = String.fromCharCode(65 + i);
-            const isThisCorrect = c.id === correctId;
-            const isThisChosen = c.id === chosenId;
-            const status: "correct" | "wrong" | "neutral" = isThisCorrect
-              ? "correct"
-              : isThisChosen
-              ? "wrong"
-              : "neutral";
+        {/* ── Interactive choice cards (MCQ / listen_choice) ── */}
+        {choices.length > 0 && (
+          <div className="fp-choice-cards">
+            {choices.map((c, i) => {
+              const letter = String.fromCharCode(65 + i);
+              const isThisCorrect = c.id === correctId;
+              const isThisChosen = c.id === chosenId;
+              const status: "correct" | "wrong" | "neutral" = isThisCorrect
+                ? "correct"
+                : isThisChosen
+                ? "wrong"
+                : "neutral";
 
-            // Find explanation for this choice
-            let section: ExplainSection | null =
-              sectionMap.get(c.label.trim().toLowerCase()) ?? null;
+              // Find explanation for this choice
+              let section: ExplainSection | null =
+                sectionMap.get(c.label.trim().toLowerCase()) ?? null;
 
-            // Try partial match if exact key not found (model may vary casing/spacing)
-            if (!section && hasSections) {
-              for (const [k, v] of sectionMap) {
-                if (c.label.toLowerCase().includes(k) || k.includes(c.label.toLowerCase())) {
-                  section = v;
-                  break;
+              // Try partial match if exact key not found (model may vary casing/spacing)
+              if (!section && hasSections) {
+                for (const [k, v] of sectionMap) {
+                  if (c.label.toLowerCase().includes(k) || k.includes(c.label.toLowerCase())) {
+                    section = v;
+                    break;
+                  }
                 }
               }
-            }
 
-            // Fallback section only on correct choice when no structured data
-            if (!section && fallbackSection && isThisCorrect) {
-              section = fallbackSection;
-            }
+              // Fallback section on correct choice when no structured data
+              if (!section && fallbackSection && isThisCorrect) {
+                section = fallbackSection;
+              }
 
-            // Auto-open correct choice always; auto-open wrong choice if user picked it
-            const defaultOpen = isThisCorrect || (!isCorrect && isThisChosen);
+              // Auto-open correct choice always; auto-open wrong choice if user picked it
+              const defaultOpen = isThisCorrect || (!isCorrect && isThisChosen);
 
-            return (
-              <ChoiceExplainCard
-                key={c.id}
-                letter={letter}
-                label={c.label}
-                status={status}
-                section={section}
-                lang={lang}
-                defaultOpen={defaultOpen}
-              />
-            );
-          })}
-        </div>
+              return (
+                <ChoiceExplainCard
+                  key={c.id}
+                  letter={letter}
+                  label={c.label}
+                  status={status}
+                  section={section}
+                  lang={lang}
+                  defaultOpen={defaultOpen}
+                />
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── Explain block for dictation (no choice cards) ── */}
+        {choices.length === 0 && fallbackSection && (
+          <div className="fp-dictation-explain">
+            <p className="fp-cc-text">{lang === "en" ? fallbackSection.en : fallbackSection.id}</p>
+          </div>
+        )}
 
         {/* ── Continue ── */}
         <button

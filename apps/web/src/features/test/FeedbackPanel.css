@@ -226,6 +226,16 @@
 .fp-cc-wrong   .fp-cc-text { color: oklch(0.35 0.12 25); }
 .fp-cc-neutral.fp-cc-open .fp-cc-text { color: oklch(0.35 0.1 262); }
 
+/* ── Dictation explain (no choice cards) ── */
+.fp-dictation-explain {
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  animation: fp-slide-u 0.35s ease 0.15s both;
+}
+.fp-correct .fp-dictation-explain { background: oklch(0.97 0.04 142); border: 1px solid oklch(0.85 0.08 142); }
+.fp-wrong   .fp-dictation-explain { background: oklch(0.97 0.03 25);  border: 1px solid oklch(0.88 0.06 25); }
+
 /* ── CTA ── */
 .fp-cta {
   display: flex; align-items: center; justify-content: center;

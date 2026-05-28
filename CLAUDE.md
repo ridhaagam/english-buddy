@@ -43,7 +43,7 @@ Shared values live in `apps/web/src/styles/tokens.css` (CSS custom properties) a
 ### Scoring / XP
 - Correct MCQ/fill/match: determined in `sessions.py` → `submit_answer`
 - Dictation answers: case-insensitive `.strip().lower()` comparison
-- XP per correct answer: `10` — lives in `app/services/xp.py`
+- XP formula (on finish): `40 × correct + 10 × total_answered + 60 (if 100%)` — computed in `sessions.py` `finish_session`
 - Score % computed on finish: `correct / total * 100`
 
 ### Celery tasks
