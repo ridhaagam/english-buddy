@@ -74,3 +74,4 @@ apps/api/seed_gery_week.py
 apps/api/seed_gery_audio.py
 apps/api/seed_gery_modules.py
 apps/api/update_explains.py
+apps/api/assign_*.py

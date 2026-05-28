@@ -357,13 +357,22 @@ export function AdminResults() {
                               )}
                             </div>
                             <p className="res-ans-prompt">{a.question_prompt ?? `Question ${i + 1}`}</p>
-                            {(a.question_kind === "choice" || a.question_kind === "fill") && (a.payload?.choices ?? []).length > 0 ? (
+                            {(a.question_kind === "choice" || a.question_kind === "fill" || a.question_kind === "listen_choice") && (a.payload?.choices ?? []).length > 0 ? (
                               <AdminChoiceBreakdown
                                 choices={a.payload.choices}
                                 selection={a.selection?.choice}
                                 correctAnswer={a.payload?.answer}
                                 isCorrect={a.is_correct}
                               />
+                            ) : a.question_kind === "dictation" ? (
+                              <p className={`res-ans-sel${a.is_correct ? " ok" : " err"}`}>
+                                → {a.selection?.text ?? "—"}
+                                {!a.is_correct && a.payload?.answer && (
+                                  <span style={{ marginLeft: 8, color: "var(--ink-3)", fontSize: 12 }}>
+                                    (correct: "{a.payload.answer}")
+                                  </span>
+                                )}
+                              </p>
                             ) : a.selection && (
                               <p className={`res-ans-sel${a.is_correct ? " ok" : " err"}`}>
                                 → {typeof a.selection === "object" ? JSON.stringify(a.selection) : a.selection}
