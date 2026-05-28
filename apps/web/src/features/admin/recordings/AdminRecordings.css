@@ -10,7 +10,7 @@
         .res-stat-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 
         /* Filter tab bar */
-        .res-filter-bar { display: flex; gap: 0; border-bottom: 1px solid var(--line); margin-bottom: 20px; overflow-x: auto; }
+        .res-filter-bar { display: flex; gap: 0; border-bottom: 1px solid var(--line); margin-bottom: 20px; overflow-x: auto; padding-bottom: 1px; }
         .res-tab { padding: 9px 16px; font-size: 13px; font-weight: 500; border: none; background: none; cursor: pointer; color: var(--ink-3); border-bottom: 2px solid transparent; margin-bottom: -1px; display: flex; align-items: center; gap: 6px; transition: color 0.15s, border-color 0.15s; font-family: var(--font-ui); white-space: nowrap; flex-shrink: 0; }
         .res-tab:hover { color: var(--ink); }
         .res-tab.active { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }

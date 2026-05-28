@@ -1,4 +1,4 @@
-import { useState, Fragment, useRef, useCallback } from "react";
+import { useState, useEffect, Fragment, useRef, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { PlusIcon, EditIcon, TrashIcon, XIcon, ArrowRightIcon, UsersIcon, CheckIcon } from "../../../components/ui";
 import { api } from "../../../lib/api";
@@ -547,11 +547,15 @@ function AssignLearnersModal({ moduleId, onClose }: { moduleId: string; onClose:
   // Build initial selection from direct assignments
   const [directIds, setDirectIds] = useState<Set<string> | null>(null);
 
-  // Once data loads, seed directIds from the response
   const learners: any[] = data?.learners ?? [];
-  if (data && directIds === null) {
-    setDirectIds(new Set(learners.filter((l: any) => l.access === "direct").map((l: any) => l.id)));
-  }
+
+  // Seed directIds once when data first loads — must be in useEffect to avoid render-phase state update
+  useEffect(() => {
+    if (data && directIds === null) {
+      setDirectIds(new Set((data.learners ?? []).filter((l: any) => l.access === "direct").map((l: any) => l.id)));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
 
   const selected = directIds ?? new Set<string>();
 

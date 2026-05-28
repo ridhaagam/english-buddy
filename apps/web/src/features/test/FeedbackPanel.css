@@ -229,6 +229,7 @@
   font-size: 13px; font-weight: 400; line-height: 1.6;
   color: var(--ink-2, #444);
   margin: 0;
+  word-break: break-word;
 }
 .fp-cc-correct .fp-cc-text { color: oklch(0.3 0.12 142); }
 .fp-cc-wrong   .fp-cc-text { color: oklch(0.35 0.12 25); }

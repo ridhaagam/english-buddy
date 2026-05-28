@@ -1,5 +1,5 @@
         .adm-page { padding-top: 28px; }
         .modal-overlay { position:fixed; inset:0; background:oklch(0 0 0/0.4); z-index:100; display:grid; place-items:center; padding:20px; }
         .modal-card { background:var(--bg); border-radius:var(--r-xl); padding:28px 28px 24px; width:min(440px,96vw); box-shadow:var(--shadow-lg); border:1px solid var(--line); }
-        .adm-cell-name { max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
-        .adm-cell-email { max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .adm-cell-name { max-width:200px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
+        .adm-cell-email { max-width:220px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
