@@ -48,7 +48,7 @@ export function TestScreen({ moduleId, onExit, onDone, resumeData }: Props) {
   const [finishing, setFinishing] = useState(false);
   const autoFinishedRef = useRef(false);
   const [revealData, setRevealData] = useState<{
-    correctId: string; chosenId: string | null; isCorrect: boolean;
+    correctId: string; chosenId: string | null; userText?: string; isCorrect: boolean;
     explain: string | null; choices: Array<{id: string; label: string}>; isLast: boolean;
     lastPayload: any;
   } | null>(null);
@@ -316,6 +316,7 @@ export function TestScreen({ moduleId, onExit, onDone, resumeData }: Props) {
       setRevealData({
         correctId,
         chosenId,
+        userText: q.kind === "dictation" ? fillInput.trim() : undefined,
         isCorrect,
         explain: q.explain || null,
         choices: [...choices],
@@ -513,7 +514,7 @@ export function TestScreen({ moduleId, onExit, onDone, resumeData }: Props) {
           )}
         </section>
 
-        {(module as any)?.require_camera !== false && (
+        {(module as any)?.require_camera === true && (
           <aside className="camera-pane fade-up" style={{ animationDelay: "100ms" }}>
             <CameraCapture
               ref={camRef}
@@ -529,6 +530,7 @@ export function TestScreen({ moduleId, onExit, onDone, resumeData }: Props) {
         <FeedbackPanel
           correctId={revealData.correctId}
           chosenId={revealData.chosenId}
+          userText={revealData.userText}
           isCorrect={revealData.isCorrect}
           explain={revealData.explain}
           choices={revealData.choices}

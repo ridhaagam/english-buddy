@@ -6,6 +6,7 @@ Create Date: 2026-05-22
 """
 from typing import Sequence, Union
 
+import sqlalchemy as sa
 from alembic import op
 
 revision: str = "008"
@@ -15,13 +16,11 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Per-user camera requirement flag
+    # Column additions are safe inside the Alembic transaction
     op.execute(
         "ALTER TABLE english_users "
         "ADD COLUMN IF NOT EXISTS require_camera BOOLEAN NOT NULL DEFAULT false"
     )
-
-    # Exam mode on modules
     op.execute(
         "ALTER TABLE english_modules "
         "ADD COLUMN IF NOT EXISTS is_exam BOOLEAN NOT NULL DEFAULT false"
@@ -31,10 +30,12 @@ def upgrade() -> None:
         "ADD COLUMN IF NOT EXISTS exam_duration_minutes INTEGER"
     )
 
-    # Add 'dictation' to the question_kind enum
-    # PostgreSQL requires ALTER TYPE outside a transaction block;
-    # using raw DDL with IF NOT EXISTS equivalent via exception suppression.
-    op.execute("ALTER TYPE question_kind ADD VALUE IF NOT EXISTS 'dictation'")
+    # ALTER TYPE ADD VALUE cannot run inside a transaction block in PostgreSQL.
+    # Use autocommit mode for this statement only.
+    bind = op.get_bind()
+    bind.execution_options(isolation_level="AUTOCOMMIT").execute(
+        sa.text("ALTER TYPE question_kind ADD VALUE IF NOT EXISTS 'dictation'")
+    )
 
 
 def downgrade() -> None:

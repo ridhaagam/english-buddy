@@ -196,7 +196,14 @@ async def update_module_settings(
     await write_log(db, actor_id=user.id, action="update_module_settings", target_kind="module", target_id=str(module_id),
                     payload={"is_closed": body.is_closed, "max_attempts": body.max_attempts, "deadline": body.deadline})
     await db.commit()
-    return {"id": str(m.id), "is_closed": m.is_closed, "max_attempts": m.max_attempts}
+    return {
+        "id": str(m.id),
+        "is_closed": m.is_closed,
+        "max_attempts": m.max_attempts,
+        "is_exam": m.is_exam,
+        "exam_duration_minutes": m.exam_duration_minutes,
+        "show_live_feedback": m.show_live_feedback,
+    }
 
 
 @router.patch("/{module_id}")

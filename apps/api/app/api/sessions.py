@@ -1,5 +1,5 @@
 import logging
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from typing import Annotated, Literal
 from uuid import UUID
 
@@ -382,7 +382,7 @@ async def submit_answer(
     if not question:
         raise HTTPException(404, "Question not found")
 
-    correct_answer = question.payload.get("answer", "")
+    correct_answer = question.payload.get("answer") or ""  # guard against explicit null
     if question.kind.value == "match":
         pairs = question.payload.get("pairs", [])
         is_correct = all(
@@ -457,7 +457,7 @@ async def finish_session(
     await db.refresh(user)  # avoid stale xp_total on concurrent sessions
     user.xp_total += xp
 
-    today = date.today()
+    today = datetime.now(timezone.utc).date()  # use UTC to match DB timestamps
     if user.last_seen_at:
         last_day = user.last_seen_at.date() if hasattr(user.last_seen_at, 'date') else today
         if last_day < today:

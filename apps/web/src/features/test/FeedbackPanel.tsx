@@ -5,6 +5,7 @@ import "./FeedbackPanel.css";
 export type FeedbackPanelProps = {
   correctId: string;
   chosenId: string | null;
+  userText?: string;       // typed text for dictation questions (not in choices)
   isCorrect: boolean;
   explain: string | null;
   choices: Array<{ id: string; label: string }>;
@@ -137,6 +138,7 @@ function ChoiceExplainCard({
 export function FeedbackPanel({
   correctId,
   chosenId,
+  userText,
   isCorrect,
   explain,
   choices,
@@ -191,7 +193,7 @@ export function FeedbackPanel({
             <span className="fp-verdict-word">{isCorrect ? "BENAR" : "SALAH"}</span>
             <span className="fp-verdict-sub">
               {isCorrect
-                ? `Jawaban kamu: ${chosenChoice?.label ?? (choices.length > 0 ? "" : correctId)}`
+                ? `Jawaban kamu: ${userText ?? chosenChoice?.label ?? ""}`
                 : `Jawaban benar: ${choices.length > 0 ? (correctChoice?.label ?? "") : correctId}`}
             </span>
           </div>
