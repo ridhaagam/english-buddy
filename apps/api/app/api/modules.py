@@ -15,6 +15,7 @@ from app.core.security import decode_token
 from app.models.module import Module, ModuleStatus, TopicType
 from app.models.question import Question
 from app.models.session import Session
+from app.services.reveal import compute_reveal
 from app.services.storage import get_file_path
 
 router = APIRouter(tags=["modules"])
@@ -26,16 +27,21 @@ def _valid_audio_token(token: str) -> bool:
     return bool(payload) and payload.get("type") == "access"
 
 
-def _public_payload(payload: dict | None) -> dict:
+def _public_payload(payload: dict | None, reveal_answers: bool) -> dict:
     """Question payload safe to send during a live test.
 
-    Drops `transcript` — it is only the seed-time TTS source for listening clips
-    and must never reach the client, or a learner could read it instead of
-    listening.
+    Always drops `transcript` (the seed-time TTS source for listening clips — a
+    learner could read it instead of listening). When the module withholds
+    results and shows no live feedback, also drops `answer` so the correct
+    answer can't be read from the network response mid-test. Scoring is done
+    server-side either way.
     """
     if not payload:
         return {}
-    return {k: v for k, v in payload.items() if k != "transcript"}
+    out = {k: v for k, v in payload.items() if k != "transcript"}
+    if not reveal_answers:
+        out.pop("answer", None)
+    return out
 
 
 class ModuleOut(BaseModel):
@@ -154,6 +160,11 @@ async def get_module(
         rng = random.Random(session_id)
         rng.shuffle(questions)
 
+    # Only expose the correct answer to the client when the module gives live
+    # feedback, or when results are already revealed — otherwise withhold it so
+    # a learner can't read answers from the response during the test.
+    reveal_answers = bool(m.show_live_feedback) or compute_reveal(m)[0]
+
     return {
         "id": str(m.id),
         "title": m.title,
@@ -177,7 +188,7 @@ async def get_module(
                 "prompt": q.prompt,
                 "context": q.context,
                 "sentence": q.sentence,
-                "payload": _public_payload(q.payload),
+                "payload": _public_payload(q.payload, reveal_answers),
                 "explain": q.explain,
             }
             for q in questions

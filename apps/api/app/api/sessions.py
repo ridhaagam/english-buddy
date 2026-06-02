@@ -18,6 +18,7 @@ from app.models.module import Module, ModuleStatus, TopicType
 from app.models.question import Question
 from app.models.session import Session, SessionAnswer, SessionEvent
 from app.models.user import UserRole
+from app.services.reveal import compute_reveal
 from app.services.storage import append_object, get_file_path, object_exists, put_object
 
 logger = logging.getLogger(__name__)
@@ -40,6 +41,8 @@ def normalize_written(text: str) -> str:
     lowered = text.replace("’", "'").strip().lower()
     no_punct = _NON_WORD_RE.sub(" ", lowered)
     return _WS_RE.sub(" ", no_punct).strip()
+
+
 
 
 class CreateSessionBody(BaseModel):
@@ -181,17 +184,9 @@ async def my_sessions(
             .limit(50)
         )
     rows = result.all()
-    now = datetime.now(timezone.utc)
     out = []
     for s, m in rows:
-        if m.reveal_at:
-            revealed = now >= m.reveal_at
-        elif m.is_exam:
-            revealed = False  # exam: hidden until reveal_at is explicitly set
-        elif m.show_answers_after_deadline and m.deadline:
-            revealed = now >= m.deadline
-        else:
-            revealed = True  # regular practice: always reveal
+        revealed, _ = compute_reveal(m)
         out.append({
             "id": str(s.id),
             "module_id": str(s.module_id),
@@ -310,25 +305,7 @@ async def get_my_session(
     mod_r = await db.execute(select(Module).where(Module.id == session.module_id))
     module = mod_r.scalar_one_or_none()
 
-    # Answers are revealed by default for practice modules. Gated when:
-    #   a) reveal_at is set → revealed when that time has passed (explicit override)
-    #   b) is_exam=True and no reveal_at set → hidden until admin sets reveal_at
-    #   c) show_answers_after_deadline=True + deadline → revealed when deadline passed
-    #   d) None of the above → reveal immediately (regular practice modules)
-    # NOTE: is_exam is checked BEFORE show_answers_after_deadline so that an exam
-    #       with a past submission deadline still hides answers until reveal_at is set.
-    answers_revealed = True
-    effective_reveal_at = None
-    if module:
-        if module.reveal_at:
-            effective_reveal_at = module.reveal_at
-            answers_revealed = datetime.now(timezone.utc) >= module.reveal_at
-        elif module.is_exam:
-            # Exam with no explicit reveal date: hide answers until admin sets one
-            answers_revealed = False
-        elif module.show_answers_after_deadline and module.deadline:
-            effective_reveal_at = module.deadline
-            answers_revealed = datetime.now(timezone.utc) >= module.deadline
+    answers_revealed, effective_reveal_at = compute_reveal(module)
 
     ans_r = await db.execute(
         select(SessionAnswer).where(SessionAnswer.session_id == session_id)
@@ -496,16 +473,15 @@ async def finish_session(
 
     mod_r = await db.execute(select(Module).where(Module.id == session.module_id))
     module = mod_r.scalar_one_or_none()
-    answers_revealed = True  # default: reveal for regular practice
-    if module:
-        if module.reveal_at:
-            answers_revealed = datetime.now(timezone.utc) >= module.reveal_at
-        elif module.is_exam:
-            answers_revealed = False  # exam: hidden until reveal_at is set
-        elif module.show_answers_after_deadline and module.deadline:
-            answers_revealed = datetime.now(timezone.utc) >= module.deadline
+    answers_revealed, _ = compute_reveal(module)
 
-    return {"score_pct": score_pct, "correct_count": correct_count, "total": total, "xp_earned": xp, "answers_revealed": answers_revealed}
+    return {
+        "score_pct": score_pct if answers_revealed else None,
+        "correct_count": correct_count if answers_revealed else None,
+        "total": total,
+        "xp_earned": xp,
+        "answers_revealed": answers_revealed,
+    }
 
 
 @router.post("/sessions/{session_id}/recording-chunk", status_code=204)
