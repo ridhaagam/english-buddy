@@ -172,6 +172,11 @@ function LearnersTab() {
         </button>
       </div>
 
+      <p style={{ margin: "0 0 14px", fontSize: 12.5, color: "var(--ink-3)", lineHeight: 1.5 }}>
+        The <strong style={{ color: "var(--ink-2)" }}>Camera</strong> column sets whether each learner must turn their camera on
+        and be recorded during sessions. Toggle it to <strong style={{ color: "var(--ink-2)" }}>Required</strong> to enforce it.
+      </p>
+
       {isLoading && <div style={{ color: "var(--ink-3)" }}>Loading…</div>}
 
       <div className="card" style={{ overflowX: "auto" }}>

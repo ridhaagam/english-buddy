@@ -7,8 +7,8 @@
         .score-label strong { font-size:28px; letter-spacing:-0.02em; line-height:1; display:block; }
         .score-label .mono { font-size:10px; color:var(--ink-3); line-height:1; display:block; }
         .res-headline { flex:1; min-width:0; }
-        .res-chips { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
-        .chip { background:var(--bg-2); border:1px solid var(--line); border-radius:var(--r-md); padding:14px 16px; display:flex; flex-direction:column; gap:4px; }
+        .res-chips { display:flex; flex-wrap:wrap; gap:12px; }
+        .chip { flex:1 1 140px; background:var(--bg-2); border:1px solid var(--line); border-radius:var(--r-md); padding:14px 16px; display:flex; flex-direction:column; gap:4px; }
         .ans-list { display:flex; flex-direction:column; gap:10px; }
         .ans-block { border-radius:var(--r-md); overflow:hidden; border:1px solid var(--line); }
         .ans-block.ans-correct { border-color:oklch(0.82 0.07 158); }
@@ -33,4 +33,4 @@
         .ac-label { flex:1; line-height:1.4; }
         .ans-explain { padding:10px 12px 14px; background:oklch(0.98 0.005 240); border-top:1px solid var(--line); }
         .res-actions { display:flex; gap:12px; justify-content:flex-end; padding-top:4px; border-top:1px solid var(--line-2); }
-        @media(max-width:560px) { .res-top{flex-direction:column;text-align:center} .res-chips{grid-template-columns:1fr 1fr} .res-actions{flex-direction:column} .res-actions .btn{width:100%;justify-content:center} }
+        @media(max-width:560px) { .res-top{flex-direction:column;text-align:center} .res-actions{flex-direction:column} .res-actions .btn{width:100%;justify-content:center} }

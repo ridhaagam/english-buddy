@@ -40,58 +40,82 @@ export function ResultsScreen({ result, onRetry, onHome }: Props) {
     <div className="res-shell">
       <div className="res-card fade-up">
         <div className="res-top">
-          <div className="score-ring-wrap">
-            <svg viewBox="0 0 120 120" width="140" height="140">
-              <circle cx="60" cy="60" r={r} stroke="var(--line)" strokeWidth="8" fill="none" />
-              <circle ref={circleRef} cx="60" cy="60" r={r}
-                stroke={perfect ? "url(#perfGrad)" : passed ? "url(#passGrad)" : "url(#failGrad)"}
-                strokeWidth="8" fill="none"
-                strokeLinecap="round"
-                strokeDasharray={circ}
-                strokeDashoffset={circ}
-                transform="rotate(-90 60 60)"
-              />
-              <defs>
-                <linearGradient id="perfGrad" x1="0" x2="1" y1="0" y2="1">
-                  <stop offset="0%" stopColor="oklch(0.7 0.14 145)" />
-                  <stop offset="100%" stopColor="oklch(0.55 0.12 158)" />
-                </linearGradient>
-                <linearGradient id="passGrad" x1="0" x2="1" y1="0" y2="1">
-                  <stop offset="0%" stopColor="oklch(0.7 0.14 158)" />
-                  <stop offset="100%" stopColor="oklch(0.55 0.12 158)" />
-                </linearGradient>
-                <linearGradient id="failGrad" x1="0" x2="1" y1="0" y2="1">
-                  <stop offset="0%" stopColor="oklch(0.7 0.1 30)" />
-                  <stop offset="100%" stopColor="oklch(0.55 0.1 25)" />
-                </linearGradient>
-              </defs>
-            </svg>
-            <div className="score-label">
-              <strong className="serif">{pct}%</strong>
-              <span className="mono">score</span>
+          {answersRevealed ? (
+            <div className="score-ring-wrap">
+              <svg viewBox="0 0 120 120" width="140" height="140">
+                <circle cx="60" cy="60" r={r} stroke="var(--line)" strokeWidth="8" fill="none" />
+                <circle ref={circleRef} cx="60" cy="60" r={r}
+                  stroke={perfect ? "url(#perfGrad)" : passed ? "url(#passGrad)" : "url(#failGrad)"}
+                  strokeWidth="8" fill="none"
+                  strokeLinecap="round"
+                  strokeDasharray={circ}
+                  strokeDashoffset={circ}
+                  transform="rotate(-90 60 60)"
+                />
+                <defs>
+                  <linearGradient id="perfGrad" x1="0" x2="1" y1="0" y2="1">
+                    <stop offset="0%" stopColor="oklch(0.7 0.14 145)" />
+                    <stop offset="100%" stopColor="oklch(0.55 0.12 158)" />
+                  </linearGradient>
+                  <linearGradient id="passGrad" x1="0" x2="1" y1="0" y2="1">
+                    <stop offset="0%" stopColor="oklch(0.7 0.14 158)" />
+                    <stop offset="100%" stopColor="oklch(0.55 0.12 158)" />
+                  </linearGradient>
+                  <linearGradient id="failGrad" x1="0" x2="1" y1="0" y2="1">
+                    <stop offset="0%" stopColor="oklch(0.7 0.1 30)" />
+                    <stop offset="100%" stopColor="oklch(0.55 0.1 25)" />
+                  </linearGradient>
+                </defs>
+              </svg>
+              <div className="score-label">
+                <strong className="serif">{pct}%</strong>
+                <span className="mono">score</span>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="score-ring-wrap" style={{ display: "grid", placeItems: "center", width: 140, height: 140 }}>
+              <div style={{ width: 96, height: 96, borderRadius: "50%", background: "var(--accent-soft)", color: "var(--accent-ink)", display: "grid", placeItems: "center" }}>
+                <CheckIcon size={40} />
+              </div>
+            </div>
+          )}
 
           <div className="res-headline">
-            {perfect && <p className="eyebrow" style={{ color: "var(--accent-ink)" }}><SparkleIcon size={12} /> Perfect session!</p>}
-            {!perfect && passed && <p className="eyebrow" style={{ color: "var(--accent-ink)" }}>Good work!</p>}
-            {!passed && <p className="eyebrow" style={{ color: "oklch(0.55 0.1 25)" }}>Keep practising!</p>}
-            <h1 className="serif" style={{ fontSize: 34, margin: "6px 0 8px", letterSpacing: "-0.02em" }}>
-              {perfect ? "Flawless!" : passed ? "Session complete." : "Almost there."}
-            </h1>
-            <p style={{ color: "var(--ink-2)", margin: 0 }}>
-              {passed
-                ? `You scored ${pct}% and earned ${xp} XP.`
-                : `You scored ${pct}%. Review and try again to improve!`}
-            </p>
+            {answersRevealed ? (
+              <>
+                {perfect && <p className="eyebrow" style={{ color: "var(--accent-ink)" }}><SparkleIcon size={12} /> Perfect session!</p>}
+                {!perfect && passed && <p className="eyebrow" style={{ color: "var(--accent-ink)" }}>Good work!</p>}
+                {!passed && <p className="eyebrow" style={{ color: "oklch(0.55 0.1 25)" }}>Keep practising!</p>}
+                <h1 className="serif" style={{ fontSize: 34, margin: "6px 0 8px", letterSpacing: "-0.02em" }}>
+                  {perfect ? "Flawless!" : passed ? "Session complete." : "Almost there."}
+                </h1>
+                <p style={{ color: "var(--ink-2)", margin: 0 }}>
+                  {passed
+                    ? `You scored ${pct}% and earned ${xp} XP.`
+                    : `You scored ${pct}%. Review and try again to improve!`}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="eyebrow" style={{ color: "var(--accent-ink)" }}>Submitted</p>
+                <h1 className="serif" style={{ fontSize: 34, margin: "6px 0 8px", letterSpacing: "-0.02em" }}>
+                  Answers submitted.
+                </h1>
+                <p style={{ color: "var(--ink-2)", margin: 0 }}>
+                  Your responses are saved. Your score and the correct answers will be available after this module closes.
+                </p>
+              </>
+            )}
           </div>
         </div>
 
         <div className="res-chips">
-          <div className="chip">
-            <span className="eyebrow">XP earned</span>
-            <strong className="serif" style={{ fontSize: 22, color: "var(--accent-ink)" }}>+{xp}</strong>
-          </div>
+          {answersRevealed && (
+            <div className="chip">
+              <span className="eyebrow">XP earned</span>
+              <strong className="serif" style={{ fontSize: 22, color: "var(--accent-ink)" }}>+{xp}</strong>
+            </div>
+          )}
           <div className="chip">
             <span className="eyebrow">Time</span>
             <strong className="serif" style={{ fontSize: 22 }}>{formatTime(timeMs)}</strong>

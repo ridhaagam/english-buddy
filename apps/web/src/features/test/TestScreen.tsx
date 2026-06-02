@@ -54,6 +54,7 @@ export function TestScreen({ moduleId, onExit, onDone, resumeData }: Props) {
   const [elapsed, setElapsed] = useState(0);
   const [tabSwitchCount, setTabSwitchCount] = useState(0);
   const [faceAnomalyCount, setFaceAnomalyCount] = useState(0);
+  const [camActive, setCamActive] = useState(false);
   const [proctoringMeta, setProctoringMeta] = useState<Record<string, { tab_switch: boolean; face_anomaly: boolean }>>({});
   const [tabAlert, setTabAlert] = useState(false);
   const [exitDialog, setExitDialog] = useState(false);
@@ -219,12 +220,16 @@ export function TestScreen({ moduleId, onExit, onDone, resumeData }: Props) {
   const matchedRights = new Set(Object.values(matchPairs));
   const allMatched = q.kind === "match" && pairs.every((p: any) => matchPairs[p.left]);
   // fill with choices: selected word; fill without choices: typed input; else: selected option
-  const canSubmit =
+  const answerReady =
     (q.kind === "match" && allMatched) ||
     (q.kind === "fill" && choices.length > 0 && selected !== null) ||
     (q.kind === "fill" && choices.length === 0 && fillInput.trim().length > 0) ||
     (q.kind === "dictation" && fillInput.trim().length > 0) ||
     ((q.kind === "choice" || q.kind === "listen_choice") && selected !== null);
+  // When the instructor requires the camera, the session can't progress until
+  // it's actually recording — so "required" is enforced, not just shown.
+  const cameraRequired = (module as any)?.require_camera === true;
+  const canSubmit = answerReady && (!cameraRequired || camActive);
 
   function resetQ() {
     setSelected(null);
@@ -527,6 +532,11 @@ export function TestScreen({ moduleId, onExit, onDone, resumeData }: Props) {
               )}
 
               <div className="q-footer">
+                {cameraRequired && !camActive && answerReady && (
+                  <p style={{ margin: "0 0 10px", fontSize: 13, color: "oklch(0.5 0.12 25)" }}>
+                    Turn on your camera to continue — it's required for this session.
+                  </p>
+                )}
                 <button className="btn accent lg q-submit" disabled={!canSubmit} onClick={submit}>
                   {last ? "Submit & see score" : "Next question"} <ArrowRightIcon size={16} />
                 </button>
@@ -539,9 +549,11 @@ export function TestScreen({ moduleId, onExit, onDone, resumeData }: Props) {
           <aside className="camera-pane fade-up" style={{ animationDelay: "100ms" }}>
             <CameraCapture
               ref={camRef}
+              required
               sessionId={sessionId}
               currentQuestionId={q.id}
               onFaceAnomaly={handleFaceAnomaly}
+              onActiveChange={setCamActive}
             />
           </aside>
         )}
@@ -764,8 +776,8 @@ function FillSentence({ sentence, pick }: { sentence: string; pick: any }) {
 
 const CameraCapture = forwardRef<
   { stopAndUpload: (sessionId: string) => Promise<void>; onFaceAnomaly: (questionId: string) => void; setSessionId: (id: string) => void },
-  { sessionId: string | null; currentQuestionId: string; onFaceAnomaly: (questionId: string) => void }
->(function CameraCapture({ sessionId: sessionIdProp, currentQuestionId, onFaceAnomaly }, ref) {
+  { sessionId: string | null; currentQuestionId: string; onFaceAnomaly: (questionId: string) => void; required?: boolean; onActiveChange?: (active: boolean) => void }
+>(function CameraCapture({ sessionId: sessionIdProp, currentQuestionId, onFaceAnomaly, required = false, onActiveChange }, ref) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<{ blob: Blob; index: number }[]>([]);
@@ -841,11 +853,17 @@ const CameraCapture = forwardRef<
   const [gazeOk, setGazeOk] = useState<boolean | null>(null);
   const [faceDetAvail, setFaceDetAvail] = useState<boolean | null>(null);
   const [faceAlert, setFaceAlert] = useState(false);
-  const [consent, setConsent] = useState<"pending" | "granted" | "declined">(
-    () => (localStorage.getItem("cam_consent") as any) || "pending"
-  );
+  const [consent, setConsent] = useState<"pending" | "granted" | "declined">(() => {
+    const stored = localStorage.getItem("cam_consent") as any;
+    // When the instructor requires the camera, a prior "declined" must not stick.
+    if (required) return stored === "granted" ? "granted" : "pending";
+    return stored || "pending";
+  });
   const [blockReason, setBlockReason] = useState<"browser" | "os" | "">("");
   const [retryCount, setRetryCount] = useState(0);
+
+  // Report recording state up so the test can require the camera to be live.
+  useEffect(() => { onActiveChange?.(status === "active"); }, [status, onActiveChange]);
 
   useImperativeHandle(ref, () => ({
     setSessionId: (id: string) => {
@@ -1014,12 +1032,18 @@ const CameraCapture = forwardRef<
           <div style={{ width: 48, height: 48, borderRadius: "50%", background: "var(--bg-2)", display: "grid", placeItems: "center", color: "var(--ink-3)" }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
           </div>
-          <p className="serif" style={{ margin: 0, fontSize: 17, letterSpacing: "-0.01em", textAlign: "center" }}>Allow camera access?</p>
+          <p className="serif" style={{ margin: 0, fontSize: 17, letterSpacing: "-0.01em", textAlign: "center" }}>
+            {required ? "Camera required for this session" : "Allow camera access?"}
+          </p>
           <p style={{ margin: 0, color: "var(--ink-3)", fontSize: 13, textAlign: "center", maxWidth: 230, lineHeight: 1.5 }}>
-            Your session is recorded for integrity monitoring. You can decline and still complete the test.
+            {required
+              ? "Your instructor requires your camera to be on while you take this session. It records for integrity monitoring."
+              : "Your session is recorded for integrity monitoring. You can decline and still complete the test."}
           </p>
           <div style={{ display: "flex", gap: 8, width: "100%" }}>
-            <button className="btn ghost" style={{ fontSize: 13, flex: 1 }} onClick={() => { setConsent("declined"); localStorage.setItem("cam_consent", "declined"); }}>Decline</button>
+            {!required && (
+              <button className="btn ghost" style={{ fontSize: 13, flex: 1 }} onClick={() => { setConsent("declined"); localStorage.setItem("cam_consent", "declined"); }}>Decline</button>
+            )}
             <button className="btn accent" style={{ fontSize: 13, flex: 1 }} onClick={() => { setConsent("granted"); localStorage.setItem("cam_consent", "granted"); }}>Allow camera</button>
           </div>
         </div>
