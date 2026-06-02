@@ -11,11 +11,31 @@ import random
 
 from app.core.database import get_db
 from app.core.deps import CurrentUser
+from app.core.security import decode_token
 from app.models.module import Module, ModuleStatus, TopicType
 from app.models.question import Question
 from app.models.session import Session
+from app.services.storage import get_file_path
 
 router = APIRouter(tags=["modules"])
+
+
+def _valid_audio_token(token: str) -> bool:
+    """An access token, validated the same way as every other token consumer."""
+    payload = decode_token(token)
+    return bool(payload) and payload.get("type") == "access"
+
+
+def _public_payload(payload: dict | None) -> dict:
+    """Question payload safe to send during a live test.
+
+    Drops `transcript` — it is only the seed-time TTS source for listening clips
+    and must never reach the client, or a learner could read it instead of
+    listening.
+    """
+    if not payload:
+        return {}
+    return {k: v for k, v in payload.items() if k != "transcript"}
 
 
 class ModuleOut(BaseModel):
@@ -157,7 +177,7 @@ async def get_module(
                 "prompt": q.prompt,
                 "context": q.context,
                 "sentence": q.sentence,
-                "payload": q.payload,
+                "payload": _public_payload(q.payload),
                 "explain": q.explain,
             }
             for q in questions
@@ -168,10 +188,12 @@ async def get_module(
 @router.get("/modules/{module_id}/audio")
 async def stream_module_audio(
     module_id: UUID,
-    user: CurrentUser,
+    token: str,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    from app.services.storage import get_file_path
+    # Query-token auth: <audio> elements can't send an Authorization header.
+    if not _valid_audio_token(token):
+        raise HTTPException(401, "Invalid token")
 
     result = await db.execute(select(Module).where(Module.id == module_id))
     m = result.scalar_one_or_none()
@@ -179,5 +201,46 @@ async def stream_module_audio(
         raise HTTPException(404, "Module not found")
     if not m.audio_blob:
         raise HTTPException(404, "No audio for this module")
-    path = get_file_path(m.audio_blob)
+    try:
+        path = get_file_path(m.audio_blob)
+    except ValueError:
+        raise HTTPException(404, "Audio file not found")
+    if not path.exists():
+        raise HTTPException(404, "Audio file not found")
+    return FileResponse(str(path), media_type="audio/mpeg")
+
+
+@router.get("/modules/{module_id}/questions/{question_id}/audio")
+async def stream_question_audio(
+    module_id: UUID,
+    question_id: UUID,
+    token: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    # Per-question audio (dictation sentence / listening clip). Query-token auth
+    # because the browser's <audio> element can't attach a bearer header.
+    if not _valid_audio_token(token):
+        raise HTTPException(401, "Invalid token")
+
+    q_r = await db.execute(
+        select(Question)
+        .join(Module, Question.module_id == Module.id)
+        .where(
+            Question.id == question_id,
+            Question.module_id == module_id,
+            Module.status == ModuleStatus.published,
+        )
+    )
+    q = q_r.scalar_one_or_none()
+    if not q:
+        raise HTTPException(404, "Question not found")
+    audio_key = (q.payload or {}).get("audio")
+    if not audio_key:
+        raise HTTPException(404, "No audio for this question")
+    try:
+        path = get_file_path(audio_key)
+    except ValueError:
+        raise HTTPException(404, "Audio file not found")
+    if not path.exists():
+        raise HTTPException(404, "Audio file not found")
     return FileResponse(str(path), media_type="audio/mpeg")

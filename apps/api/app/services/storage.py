@@ -31,4 +31,14 @@ def delete_object(key: str) -> None:
 
 
 def get_file_path(key: str) -> pathlib.Path:
-    return pathlib.Path(settings.FILES_ROOT) / key
+    """Resolve a storage key to an absolute path, refusing to escape FILES_ROOT.
+
+    Guards against path traversal (``../``) and absolute keys for any value that
+    may originate from user-controlled data (e.g. a question payload). Raises
+    ValueError if the resolved path would fall outside the storage root.
+    """
+    base = pathlib.Path(settings.FILES_ROOT).resolve()
+    target = (base / key).resolve()
+    if not target.is_relative_to(base):
+        raise ValueError(f"unsafe storage key: {key!r}")
+    return target

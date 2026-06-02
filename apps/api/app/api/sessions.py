@@ -1,4 +1,5 @@
 import logging
+import re
 from datetime import datetime, timezone
 from typing import Annotated, Literal
 from uuid import UUID
@@ -22,6 +23,23 @@ from app.services.storage import append_object, get_file_path, object_exists, pu
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["sessions"])
+
+_NON_WORD_RE = re.compile(r"[^\w\s']", flags=re.UNICODE)
+_WS_RE = re.compile(r"\s+")
+
+
+def normalize_written(text: str) -> str:
+    """Forgiving comparison for dictation / written answers.
+
+    A learner is marked correct as long as the words are spelled right —
+    capitalisation and punctuation are ignored. So "the image was captured
+    clearly" matches "The image was captured clearly." and "cat" matches "Cat".
+    """
+    if not text:
+        return ""
+    lowered = text.replace("’", "'").strip().lower()
+    no_punct = _NON_WORD_RE.sub(" ", lowered)
+    return _WS_RE.sub(" ", no_punct).strip()
 
 
 class CreateSessionBody(BaseModel):
@@ -391,8 +409,7 @@ async def submit_answer(
             body.selection.get(p["left"]) == p["right"] for p in pairs
         ) if pairs else False
     elif question.kind.value == "dictation":
-        typed = body.selection.get("text", "").strip().lower()
-        is_correct = typed == correct_answer.strip().lower()
+        is_correct = normalize_written(body.selection.get("text", "")) == normalize_written(correct_answer)
     else:
         is_correct = body.selection.get("choice") == correct_answer
 
