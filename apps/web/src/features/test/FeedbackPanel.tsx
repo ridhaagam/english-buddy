@@ -270,9 +270,13 @@ export function FeedbackPanel({
         )}
 
         {/* ── Explain block for dictation (no choice cards) ── */}
-        {choices.length === 0 && fallbackSection && (
+        {choices.length === 0 && (hasSections || fallbackSection) && (
           <div className="fp-dictation-explain">
-            <p className="fp-cc-text">{lang === "en" ? fallbackSection.en : fallbackSection.id}</p>
+            <p className="fp-cc-text">
+              {fallbackSection
+                ? (lang === "en" ? fallbackSection.en : fallbackSection.id)
+                : sections.map((s) => (lang === "en" ? s.en : s.id)).join(" ")}
+            </p>
           </div>
         )}
 

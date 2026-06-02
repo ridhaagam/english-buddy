@@ -23,6 +23,18 @@ import { api } from "../../lib/api";
 import { FeedbackPanel } from "./FeedbackPanel";
 import "./TestScreen.css";
 
+// Forgiving comparison for dictation answers — ignores capitalisation and
+// punctuation so only the spelling of the words matters. Mirrors the backend
+// `normalize_written` so the live feedback agrees with the saved score.
+function normalizeWritten(text: string): string {
+  return (text || "")
+    .replace(/’/g, "'")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}_\s']/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 type Props = {
   moduleId: string;
   onExit: () => void;
@@ -290,7 +302,7 @@ export function TestScreen({ moduleId, onExit, onDone, resumeData }: Props) {
     const correctId: string = q.payload?.answer || "";
     const chosenId = (q.kind === "choice" || q.kind === "fill" || q.kind === "listen_choice") ? selected : null;
     const isCorrect = q.kind === "dictation"
-      ? fillInput.trim().toLowerCase() === correctId.trim().toLowerCase()
+      ? normalizeWritten(fillInput) === normalizeWritten(correctId)
       : !!(correctId && chosenId && chosenId === correctId);
     const correctLabel = choices.find((c: any) => c.id === correctId)?.label || correctId;
 
@@ -426,7 +438,13 @@ export function TestScreen({ moduleId, onExit, onDone, resumeData }: Props) {
 
           {(q.kind === "listen_choice" || q.kind === "dictation") && (
             <AudioPlayer
-              src={(module as any)?.audio_blob ? `/api/v1/modules/${moduleId}/audio` : undefined}
+              src={
+                q.payload?.audio
+                  ? `/api/v1/modules/${moduleId}/questions/${q.id}/audio`
+                  : (module as any)?.audio_blob
+                    ? `/api/v1/modules/${moduleId}/audio`
+                    : undefined
+              }
               fallbackText={q.kind === "dictation" ? (q.payload?.answer ?? undefined) : undefined}
             />
           )}
@@ -473,7 +491,7 @@ export function TestScreen({ moduleId, onExit, onDone, resumeData }: Props) {
                     onKeyDown={(e) => e.key === "Enter" && canSubmit && submit()}
                     autoFocus
                   />
-                  <p className="dictation-hint eyebrow">Listen to the audio, then type exactly what you hear</p>
+                  <p className="dictation-hint eyebrow">Listen and type what you hear — capitalisation and punctuation don't matter</p>
                 </div>
               )}
 
@@ -609,6 +627,7 @@ export function TestScreen({ moduleId, onExit, onDone, resumeData }: Props) {
 
 function AudioPlayer({ src, fallbackText }: { src?: string; fallbackText?: string }) {
   const audioRef = useRef<HTMLAudioElement>(null);
+  const mountedRef = useRef(true);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -621,6 +640,17 @@ function AudioPlayer({ src, fallbackText }: { src?: string; fallbackText?: strin
   const useTts = !src || loadError;
   const ttsAvail = useTts && !!fallbackText && typeof window !== "undefined" && !!window.speechSynthesis;
 
+  // Stop any in-progress speech when the player unmounts (the question subtree
+  // is keyed by question id, so advancing remounts this) — otherwise the global
+  // speechSynthesis keeps reading the previous question aloud.
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      try { window.speechSynthesis?.cancel(); } catch {}
+    };
+  }, []);
+
   function toggle() {
     if (useTts) {
       if (!ttsAvail) return;
@@ -631,8 +661,8 @@ function AudioPlayer({ src, fallbackText }: { src?: string; fallbackText?: strin
         const utt = new SpeechSynthesisUtterance(fallbackText!);
         utt.lang = "en-US";
         utt.rate = 0.85;
-        utt.onend = () => setPlaying(false);
-        utt.onerror = () => setPlaying(false);
+        utt.onend = () => { if (mountedRef.current) setPlaying(false); };
+        utt.onerror = () => { if (mountedRef.current) setPlaying(false); };
         window.speechSynthesis.speak(utt);
         setPlaying(true);
       }
@@ -640,8 +670,12 @@ function AudioPlayer({ src, fallbackText }: { src?: string; fallbackText?: strin
     }
     const a = audioRef.current;
     if (!a) return;
-    if (playing) { a.pause(); } else { a.play(); }
-    setPlaying(!playing);
+    if (playing) {
+      a.pause();
+      setPlaying(false);
+    } else {
+      a.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
+    }
   }
 
   const playerBase = {
