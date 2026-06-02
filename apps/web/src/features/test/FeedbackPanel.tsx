@@ -175,6 +175,18 @@ export function FeedbackPanel({
     fallbackSection = { choiceLabel: label, type: "correct", en, id };
   }
 
+  // Dictation has no choice cards, so its explanation is a standalone block.
+  // Resolve the text up front and skip the block (and the language toggle) when
+  // it's empty — otherwise a parsed-but-bodyless section would render a bare box.
+  const dictationExplain =
+    choices.length === 0
+      ? (fallbackSection
+          ? lang === "en" ? fallbackSection.en : fallbackSection.id
+          : sections.map((s) => (lang === "en" ? s.en : s.id)).join(" ")
+        ).trim()
+      : "";
+  const showLangToggle = choices.length > 0 ? hasSections || !!fallbackSection : !!dictationExplain;
+
   return (
     <div className={`fp-overlay${visible ? " fp-visible" : ""}`}>
       <div
@@ -202,7 +214,7 @@ export function FeedbackPanel({
         </div>
 
         {/* ── Language toggle ── */}
-        {(hasSections || fallbackSection) && (
+        {showLangToggle && (
           <div className="fp-lang-toggle">
             <button
               className={`fp-lang-btn${lang === "id" ? " active" : ""}`}
@@ -270,13 +282,9 @@ export function FeedbackPanel({
         )}
 
         {/* ── Explain block for dictation (no choice cards) ── */}
-        {choices.length === 0 && (hasSections || fallbackSection) && (
+        {choices.length === 0 && dictationExplain && (
           <div className="fp-dictation-explain">
-            <p className="fp-cc-text">
-              {fallbackSection
-                ? (lang === "en" ? fallbackSection.en : fallbackSection.id)
-                : sections.map((s) => (lang === "en" ? s.en : s.id)).join(" ")}
-            </p>
+            <p className="fp-cc-text">{dictationExplain}</p>
           </div>
         )}
 

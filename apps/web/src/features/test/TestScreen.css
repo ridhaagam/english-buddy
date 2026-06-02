@@ -25,7 +25,7 @@
         .fill-input { width:100%; padding:14px 16px; border:1.5px solid var(--line); border-radius:var(--r-md); font-size:16px; background:var(--bg); color:var(--ink); margin-bottom:8px; box-sizing:border-box; }
         .fill-input:focus { outline:none; border-color:var(--accent); }
         .dictation-input-wrap { margin-bottom:20px; }
-        .dictation-hint { color:var(--ink-3); font-size:11px; margin:0 0 16px; }
+        .dictation-hint { color:var(--ink-3); font-size:12.5px; line-height:1.45; margin:0 0 16px; }
         .match-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:0 0 24px; }
         .match-col { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:8px; }
         .match-col-head { padding:0 4px 2px; font-size:10px; }

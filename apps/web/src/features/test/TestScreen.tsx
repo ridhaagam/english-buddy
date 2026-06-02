@@ -491,7 +491,7 @@ export function TestScreen({ moduleId, onExit, onDone, resumeData }: Props) {
                     onKeyDown={(e) => e.key === "Enter" && canSubmit && submit()}
                     autoFocus
                   />
-                  <p className="dictation-hint eyebrow">Listen and type what you hear — capitalisation and punctuation don't matter</p>
+                  <p className="dictation-hint">Listen and type what you hear. Capitalization and punctuation don't matter.</p>
                 </div>
               )}
 
