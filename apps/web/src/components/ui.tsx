@@ -189,6 +189,9 @@ export const UserIcon = ({ size = 16 }: { size?: number }) => (
 export const LayersIcon = ({ size = 16 }: { size?: number }) => (
   <IconBase size={size}><polygon points="12 2 2 7 12 12 22 7 12 2" /><polyline points="2 17 12 22 22 17" /><polyline points="2 12 12 17 22 12" /></IconBase>
 );
+export const KeyboardIcon = ({ size = 16 }: { size?: number }) => (
+  <IconBase size={size}><rect x="2" y="5" width="20" height="14" rx="2.5" /><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 13h.01M18 13h.01M9 13h6" /></IconBase>
+);
 
 // ----- Topbar ---------------------------------------------------------------
 type TopbarProps = {
@@ -219,6 +222,7 @@ export function Topbar({ route, onNav, user, onLogout, onOpenAdmin }: TopbarProp
             <nav>
               <button aria-current={route === "profile" ? "true" : undefined} onClick={() => onNav("profile")}>Dashboard</button>
               <button aria-current={route === "practice" ? "true" : undefined} onClick={() => onNav("practice")}>Practice</button>
+              <button aria-current={route === "typing" ? "true" : undefined} onClick={() => onNav("typing")}>Type</button>
               <button aria-current={route === "library" ? "true" : undefined} onClick={() => onNav("library")}>Library</button>
             </nav>
             <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -272,6 +276,10 @@ export function Topbar({ route, onNav, user, onLogout, onOpenAdmin }: TopbarProp
           <button className={route === "practice" ? "active" : ""} onClick={() => onNav("practice")}>
             <BookOpenIcon size={18} />
             Practice
+          </button>
+          <button className={route === "typing" ? "active" : ""} onClick={() => onNav("typing")}>
+            <KeyboardIcon size={18} />
+            Type
           </button>
           <button className={route === "library" ? "active" : ""} onClick={() => onNav("library")}>
             <CompassIcon size={18} />

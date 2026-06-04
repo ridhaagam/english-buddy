@@ -17,6 +17,7 @@ from app.api.auth import router as auth_router
 from app.api.me import router as me_router
 from app.api.modules import router as modules_router
 from app.api.sessions import router as sessions_router
+from app.api.typing import router as typing_router
 from app.api.admin.dashboard import router as admin_dashboard_router
 from app.api.admin.modules import router as admin_modules_router
 from app.api.admin.recordings import router as admin_recordings_router
@@ -33,6 +34,7 @@ app.include_router(auth_router, prefix=PREFIX)
 app.include_router(me_router, prefix=PREFIX)
 app.include_router(modules_router, prefix=PREFIX)
 app.include_router(sessions_router, prefix=PREFIX)
+app.include_router(typing_router, prefix=PREFIX)
 app.include_router(admin_dashboard_router, prefix=PREFIX)
 app.include_router(admin_modules_router, prefix=PREFIX)
 app.include_router(admin_recordings_router, prefix=PREFIX)

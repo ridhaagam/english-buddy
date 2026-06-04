@@ -869,6 +869,11 @@ async def seed():
                     time_spent_ms=12000,
                 ))
 
+        # Typing-trainer word decks (audio renders lazily on first play so first
+        # boot stays fast; run `python seed_typing.py` to pre-render).
+        from seed_typing import seed_typing
+        await seed_typing(db, owner_id=owner.id, render_audio=False)
+
         await db.commit()
         print("✓ Database seeded successfully.")
         print("  Admin:   admin@example.com / admin123")

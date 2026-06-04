@@ -175,6 +175,29 @@ export const api = {
       }),
   },
 
+  typing: {
+    decks: () => request<any[]>("/typing/decks"),
+    deck: (id: string) => request<any>(`/typing/decks/${id}`),
+    chapter: (deckId: string, chapterIndex: number) =>
+      request<any>(`/typing/decks/${deckId}/chapters/${chapterIndex}`),
+    review: (limit = 30) => request<any[]>(`/typing/review?limit=${limit}`),
+    stats: () => request<any>("/typing/stats"),
+    start: (body: { deck_id?: string | null; chapter_index?: number; mode?: string }) =>
+      request<{ id: string }>("/typing/sessions", { method: "POST", body: JSON.stringify(body) }),
+    finish: (sessionId: string, body: {
+      total: number; correct: number; wrong_count?: number; accuracy?: number;
+      wpm?: number; duration_ms?: number; results?: { word_id: string; correct: boolean }[];
+    }) =>
+      request<{ xp_earned: number; wpm: number; accuracy: number; correct: number; total: number }>(
+        `/typing/sessions/${sessionId}/finish`,
+        { method: "POST", body: JSON.stringify(body) }
+      ),
+    wordAudio: (wordId: string) => {
+      const token = localStorage.getItem("access_token");
+      return `${BASE}/typing/words/${wordId}/audio${token ? `?token=${token}` : ""}`;
+    },
+  },
+
   admin: {
     dashboard: () => request<any>("/admin/dashboard"),
     modules: {

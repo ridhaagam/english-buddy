@@ -20,10 +20,12 @@ import { AdminFaceTest } from "./features/admin/face-test/AdminFaceTest";
 import { AdminCourses } from "./features/admin/courses/AdminCourses";
 import { ProfileEditPage } from "./features/profile/ProfileEditPage";
 import { SessionDetailPage } from "./features/practice/SessionDetailPage";
+import { TypingHome, type TypingLaunch } from "./features/typing/TypingHome";
+import { TypingPractice } from "./features/typing/TypingPractice";
 import { api } from "./lib/api";
 import "./App.css";
 
-type AppRoute = "profile" | "library" | "practice" | "test" | "results" | "admin" | "profile-edit" | "session-detail";
+type AppRoute = "profile" | "library" | "practice" | "test" | "results" | "admin" | "profile-edit" | "session-detail" | "typing" | "typing-practice";
 
 export function App() {
   const queryClient = useQueryClient();
@@ -34,6 +36,8 @@ export function App() {
   const [result, setResult] = useState<any>(null);
   const [adminMode, setAdminMode] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState<string | undefined>(undefined);
+  const [typingLaunch, setTypingLaunch] = useState<TypingLaunch | null>(null);
+  const [typingRunKey, setTypingRunKey] = useState(0);
   const [testResumeData, setTestResumeData] = useState<{ answeredQuestionIds: string[]; previousSessionId: string } | undefined>(undefined);
   const [resumeDialog, setResumeDialog] = useState<{
     moduleId: string;
@@ -89,6 +93,18 @@ export function App() {
     launchTest(moduleId);
   }
 
+  function launchTyping(launch: TypingLaunch) {
+    setTypingLaunch(launch);
+    setTypingRunKey((k) => k + 1);
+    setRoute("typing-practice");
+  }
+
+  function handleTypingProgress() {
+    queryClient.invalidateQueries({ queryKey: ["typing-decks"] });
+    queryClient.invalidateQueries({ queryKey: ["typing-stats"] });
+    api.me.get().then((me) => setUser(me)).catch(() => {});
+  }
+
   function handleDone(res: any) {
     setResult(res);
     setRoute("results");
@@ -136,6 +152,19 @@ export function App() {
     );
   }
 
+  if (route === "typing-practice" && typingLaunch) {
+    return (
+      <TypingPractice
+        key={typingRunKey}
+        launch={typingLaunch}
+        onExit={() => setRoute("typing")}
+        onProgress={handleTypingProgress}
+        onRedo={() => launchTyping(typingLaunch)}
+        onNext={() => launchTyping({ ...typingLaunch, chapterIndex: typingLaunch.chapterIndex + 1 })}
+      />
+    );
+  }
+
   const isOwner = user?.role === "owner";
 
   if (adminMode && isAdmin) {
@@ -179,6 +208,9 @@ export function App() {
         )}
         {route === "library" && (
           <LibraryScreen onStartTest={(id) => startTest(id)} />
+        )}
+        {route === "typing" && (
+          <TypingHome onPlay={launchTyping} />
         )}
         {route === "practice" && (
           <PracticeScreen

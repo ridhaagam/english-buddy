@@ -1,0 +1,968 @@
+[
+  {
+    "slug": "everyday-a1",
+    "words": [
+      {
+        "word": "home",
+        "phonetic": "/hoʊm/",
+        "pos": "n.",
+        "translation": "rumah",
+        "example": "I go home after school every day.",
+        "example_translation": "Saya pulang ke rumah setelah sekolah setiap hari."
+      },
+      {
+        "word": "house",
+        "phonetic": "/haʊs/",
+        "pos": "n.",
+        "translation": "rumah",
+        "example": "Their house has a small green garden.",
+        "example_translation": "Rumah mereka punya kebun kecil yang hijau."
+      },
+      {
+        "word": "water",
+        "phonetic": "/ˈwɔːtər/",
+        "pos": "n.",
+        "translation": "air",
+        "example": "Please give me a glass of water.",
+        "example_translation": "Tolong beri saya segelas air."
+      },
+      {
+        "word": "food",
+        "phonetic": "/fuːd/",
+        "pos": "n.",
+        "translation": "makanan",
+        "example": "The food on this table smells very good.",
+        "example_translation": "Makanan di meja ini baunya sangat enak."
+      },
+      {
+        "word": "rice",
+        "phonetic": "/raɪs/",
+        "pos": "n.",
+        "translation": "nasi",
+        "example": "We eat rice with chicken for lunch.",
+        "example_translation": "Kami makan nasi dengan ayam untuk makan siang."
+      },
+      {
+        "word": "family",
+        "phonetic": "/ˈfæməli/",
+        "pos": "n.",
+        "translation": "keluarga",
+        "example": "My family eats dinner together every night.",
+        "example_translation": "Keluarga saya makan malam bersama setiap malam."
+      },
+      {
+        "word": "mother",
+        "phonetic": "/ˈmʌðər/",
+        "pos": "n.",
+        "translation": "ibu",
+        "example": "My mother cooks soup for us today.",
+        "example_translation": "Ibu saya memasak sup untuk kami hari ini."
+      },
+      {
+        "word": "father",
+        "phonetic": "/ˈfɑːðər/",
+        "pos": "n.",
+        "translation": "ayah",
+        "example": "My father drives to work in the morning.",
+        "example_translation": "Ayah saya menyetir ke tempat kerja di pagi hari."
+      },
+      {
+        "word": "time",
+        "phonetic": "/taɪm/",
+        "pos": "n.",
+        "translation": "waktu",
+        "example": "What time do you wake up today?",
+        "example_translation": "Jam berapa kamu bangun hari ini?"
+      },
+      {
+        "word": "day",
+        "phonetic": "/deɪ/",
+        "pos": "n.",
+        "translation": "hari",
+        "example": "Today is a very busy day for me.",
+        "example_translation": "Hari ini adalah hari yang sangat sibuk bagi saya."
+      },
+      {
+        "word": "morning",
+        "phonetic": "/ˈmɔːrnɪŋ/",
+        "pos": "n.",
+        "translation": "pagi",
+        "example": "I drink coffee every morning before work.",
+        "example_translation": "Saya minum kopi setiap pagi sebelum kerja."
+      },
+      {
+        "word": "eat",
+        "phonetic": "/iːt/",
+        "pos": "v.",
+        "translation": "makan",
+        "example": "We eat breakfast together at seven o'clock.",
+        "example_translation": "Kami makan sarapan bersama pukul tujuh."
+      },
+      {
+        "word": "drink",
+        "phonetic": "/drɪŋk/",
+        "pos": "v.",
+        "translation": "minum",
+        "example": "Children should drink milk before they sleep.",
+        "example_translation": "Anak-anak sebaiknya minum susu sebelum tidur."
+      },
+      {
+        "word": "sleep",
+        "phonetic": "/sliːp/",
+        "pos": "v.",
+        "translation": "tidur",
+        "example": "I sleep for eight hours every night.",
+        "example_translation": "Saya tidur selama delapan jam setiap malam."
+      },
+      {
+        "word": "go",
+        "phonetic": "/ɡoʊ/",
+        "pos": "v.",
+        "translation": "pergi",
+        "example": "They go to the market on Sunday.",
+        "example_translation": "Mereka pergi ke pasar pada hari Minggu."
+      },
+      {
+        "word": "make",
+        "phonetic": "/meɪk/",
+        "pos": "v.",
+        "translation": "membuat",
+        "example": "She can make a cake for the party.",
+        "example_translation": "Dia bisa membuat kue untuk pesta."
+      },
+      {
+        "word": "open",
+        "phonetic": "/ˈoʊpən/",
+        "pos": "v.",
+        "translation": "membuka",
+        "example": "Please open the window for fresh air.",
+        "example_translation": "Tolong buka jendela untuk udara segar."
+      },
+      {
+        "word": "good",
+        "phonetic": "/ɡʊd/",
+        "pos": "adj.",
+        "translation": "baik",
+        "example": "This is a good book for children.",
+        "example_translation": "Ini adalah buku yang bagus untuk anak-anak."
+      },
+      {
+        "word": "big",
+        "phonetic": "/bɪɡ/",
+        "pos": "adj.",
+        "translation": "besar",
+        "example": "They live in a big white house.",
+        "example_translation": "Mereka tinggal di rumah putih yang besar."
+      },
+      {
+        "word": "small",
+        "phonetic": "/smɔːl/",
+        "pos": "adj.",
+        "translation": "kecil",
+        "example": "My room is small but very clean.",
+        "example_translation": "Kamar saya kecil tapi sangat bersih."
+      }
+    ]
+  },
+  {
+    "slug": "travel-a2",
+    "words": [
+      {
+        "word": "airport",
+        "phonetic": "/ˈɛrpɔːrt/",
+        "pos": "n.",
+        "translation": "bandara",
+        "example": "We waited two hours at the busy airport.",
+        "example_translation": "Kami menunggu dua jam di bandara yang ramai."
+      },
+      {
+        "word": "passport",
+        "phonetic": "/ˈpæspɔːrt/",
+        "pos": "n.",
+        "translation": "paspor",
+        "example": "Please show your passport at the gate.",
+        "example_translation": "Tolong tunjukkan paspor Anda di gerbang."
+      },
+      {
+        "word": "luggage",
+        "phonetic": "/ˈlʌɡɪdʒ/",
+        "pos": "n.",
+        "translation": "bagasi",
+        "example": "My luggage is too heavy to carry alone.",
+        "example_translation": "Bagasi saya terlalu berat untuk dibawa sendiri."
+      },
+      {
+        "word": "flight",
+        "phonetic": "/flaɪt/",
+        "pos": "n.",
+        "translation": "penerbangan",
+        "example": "Our flight to Bali leaves early tomorrow morning.",
+        "example_translation": "Penerbangan kami ke Bali berangkat pagi-pagi besok."
+      },
+      {
+        "word": "ticket",
+        "phonetic": "/ˈtɪkɪt/",
+        "pos": "n.",
+        "translation": "tiket",
+        "example": "I bought a train ticket at the counter.",
+        "example_translation": "Saya membeli tiket kereta di loket."
+      },
+      {
+        "word": "train",
+        "phonetic": "/treɪn/",
+        "pos": "n.",
+        "translation": "kereta api",
+        "example": "The fast train arrives at the city station.",
+        "example_translation": "Kereta cepat itu tiba di stasiun kota."
+      },
+      {
+        "word": "station",
+        "phonetic": "/ˈsteɪʃən/",
+        "pos": "n.",
+        "translation": "stasiun",
+        "example": "Meet me near the entrance of the station.",
+        "example_translation": "Temui saya dekat pintu masuk stasiun."
+      },
+      {
+        "word": "taxi",
+        "phonetic": "/ˈtæksi/",
+        "pos": "n.",
+        "translation": "taksi",
+        "example": "Let's take a taxi to the hotel tonight.",
+        "example_translation": "Ayo naik taksi ke hotel malam ini."
+      },
+      {
+        "word": "map",
+        "phonetic": "/mæp/",
+        "pos": "n.",
+        "translation": "peta",
+        "example": "She looked at the map to find directions.",
+        "example_translation": "Dia melihat peta untuk mencari arah."
+      },
+      {
+        "word": "tourist",
+        "phonetic": "/ˈtʊrɪst/",
+        "pos": "n.",
+        "translation": "wisatawan",
+        "example": "Many tourists visit this old temple every year.",
+        "example_translation": "Banyak wisatawan mengunjungi kuil tua ini setiap tahun."
+      },
+      {
+        "word": "hotel",
+        "phonetic": "/hoʊˈtɛl/",
+        "pos": "n.",
+        "translation": "hotel",
+        "example": "Our hotel room has a lovely sea view.",
+        "example_translation": "Kamar hotel kami memiliki pemandangan laut yang indah."
+      },
+      {
+        "word": "arrive",
+        "phonetic": "/əˈraɪv/",
+        "pos": "v.",
+        "translation": "tiba",
+        "example": "We will arrive at the airport before noon.",
+        "example_translation": "Kami akan tiba di bandara sebelum tengah hari."
+      },
+      {
+        "word": "return",
+        "phonetic": "/rɪˈtɜːrn/",
+        "pos": "v.",
+        "translation": "kembali",
+        "example": "They will return home after the long journey.",
+        "example_translation": "Mereka akan kembali ke rumah setelah perjalanan panjang."
+      },
+      {
+        "word": "straight",
+        "phonetic": "/streɪt/",
+        "pos": "adv.",
+        "translation": "lurus",
+        "example": "Go straight ahead until you reach the bank.",
+        "example_translation": "Jalan lurus terus sampai Anda mencapai bank."
+      },
+      {
+        "word": "left",
+        "phonetic": "/lɛft/",
+        "pos": "n.",
+        "translation": "kiri",
+        "example": "Turn to the left at the next corner.",
+        "example_translation": "Belok ke kiri di tikungan berikutnya."
+      },
+      {
+        "word": "right",
+        "phonetic": "/raɪt/",
+        "pos": "n.",
+        "translation": "kanan",
+        "example": "The station is on your right after the bridge.",
+        "example_translation": "Stasiunnya ada di sebelah kanan Anda setelah jembatan."
+      },
+      {
+        "word": "corner",
+        "phonetic": "/ˈkɔːrnər/",
+        "pos": "n.",
+        "translation": "sudut",
+        "example": "The small shop is just around the corner.",
+        "example_translation": "Toko kecil itu tepat di tikungan jalan."
+      },
+      {
+        "word": "journey",
+        "phonetic": "/ˈdʒɜːrni/",
+        "pos": "n.",
+        "translation": "perjalanan",
+        "example": "The bus journey to the mountains takes three hours.",
+        "example_translation": "Perjalanan bus ke pegunungan memakan waktu tiga jam."
+      },
+      {
+        "word": "board",
+        "phonetic": "/bɔːrd/",
+        "pos": "v.",
+        "translation": "naik",
+        "example": "Passengers can board the plane in ten minutes.",
+        "example_translation": "Penumpang bisa naik pesawat dalam sepuluh menit."
+      },
+      {
+        "word": "book",
+        "phonetic": "/bʊk/",
+        "pos": "v.",
+        "translation": "memesan",
+        "example": "I want to book a room for two nights.",
+        "example_translation": "Saya ingin memesan kamar untuk dua malam."
+      }
+    ]
+  },
+  {
+    "slug": "work-b1",
+    "words": [
+      {
+        "word": "colleague",
+        "phonetic": "/ˈkɑːliːɡ/",
+        "pos": "n.",
+        "translation": "rekan kerja",
+        "example": "My colleague helped me finish the report on time.",
+        "example_translation": "Rekan kerja saya membantu saya menyelesaikan laporan tepat waktu."
+      },
+      {
+        "word": "meeting",
+        "phonetic": "/ˈmiːtɪŋ/",
+        "pos": "n.",
+        "translation": "rapat; pertemuan",
+        "example": "We have a team meeting every Monday morning.",
+        "example_translation": "Kami mengadakan rapat tim setiap Senin pagi."
+      },
+      {
+        "word": "deadline",
+        "phonetic": "/ˈdedlaɪn/",
+        "pos": "n.",
+        "translation": "tenggat waktu; batas waktu",
+        "example": "The deadline for this project is next Friday.",
+        "example_translation": "Tenggat waktu untuk proyek ini adalah Jumat depan."
+      },
+      {
+        "word": "schedule",
+        "phonetic": "/ˈskedʒuːl/",
+        "pos": "n.",
+        "translation": "jadwal",
+        "example": "Please check the schedule before booking the room.",
+        "example_translation": "Tolong periksa jadwal sebelum memesan ruangan."
+      },
+      {
+        "word": "task",
+        "phonetic": "/tæsk/",
+        "pos": "n.",
+        "translation": "tugas",
+        "example": "I have several tasks to complete today.",
+        "example_translation": "Saya punya beberapa tugas untuk diselesaikan hari ini."
+      },
+      {
+        "word": "attachment",
+        "phonetic": "/əˈtætʃmənt/",
+        "pos": "n.",
+        "translation": "lampiran",
+        "example": "Please find the report in the attachment below.",
+        "example_translation": "Silakan lihat laporan pada lampiran di bawah ini."
+      },
+      {
+        "word": "reply",
+        "phonetic": "/rɪˈplaɪ/",
+        "pos": "v.",
+        "translation": "membalas; menjawab",
+        "example": "I will reply to your email this afternoon.",
+        "example_translation": "Saya akan membalas email Anda sore ini."
+      },
+      {
+        "word": "forward",
+        "phonetic": "/ˈfɔːrwərd/",
+        "pos": "v.",
+        "translation": "meneruskan",
+        "example": "Could you forward this message to the manager?",
+        "example_translation": "Bisakah kamu meneruskan pesan ini ke manajer?"
+      },
+      {
+        "word": "agenda",
+        "phonetic": "/əˈdʒendə/",
+        "pos": "n.",
+        "translation": "agenda; daftar acara",
+        "example": "The first item on the agenda is the budget.",
+        "example_translation": "Poin pertama dalam agenda adalah anggaran."
+      },
+      {
+        "word": "client",
+        "phonetic": "/ˈklaɪənt/",
+        "pos": "n.",
+        "translation": "klien; pelanggan",
+        "example": "The client is happy with our new service.",
+        "example_translation": "Klien itu senang dengan layanan baru kami."
+      },
+      {
+        "word": "manager",
+        "phonetic": "/ˈmænɪdʒər/",
+        "pos": "n.",
+        "translation": "manajer",
+        "example": "Our manager will lead the meeting today.",
+        "example_translation": "Manajer kami akan memimpin rapat hari ini."
+      },
+      {
+        "word": "report",
+        "phonetic": "/rɪˈpɔːrt/",
+        "pos": "n.",
+        "translation": "laporan",
+        "example": "She wrote a detailed report about the sales.",
+        "example_translation": "Dia menulis laporan terperinci tentang penjualan."
+      },
+      {
+        "word": "department",
+        "phonetic": "/dɪˈpɑːrtmənt/",
+        "pos": "n.",
+        "translation": "departemen; bagian",
+        "example": "He works in the marketing department.",
+        "example_translation": "Dia bekerja di departemen pemasaran."
+      },
+      {
+        "word": "appointment",
+        "phonetic": "/əˈpɔɪntmənt/",
+        "pos": "n.",
+        "translation": "janji temu",
+        "example": "I have an appointment with a client at noon.",
+        "example_translation": "Saya punya janji temu dengan klien pada siang hari."
+      },
+      {
+        "word": "remind",
+        "phonetic": "/rɪˈmaɪnd/",
+        "pos": "v.",
+        "translation": "mengingatkan",
+        "example": "Please remind me about the meeting tomorrow.",
+        "example_translation": "Tolong ingatkan saya tentang rapat besok."
+      },
+      {
+        "word": "discuss",
+        "phonetic": "/dɪˈskʌs/",
+        "pos": "v.",
+        "translation": "membahas; mendiskusikan",
+        "example": "We need to discuss the new plan together.",
+        "example_translation": "Kita perlu membahas rencana baru itu bersama-sama."
+      },
+      {
+        "word": "busy",
+        "phonetic": "/ˈbɪzi/",
+        "pos": "adj.",
+        "translation": "sibuk",
+        "example": "I am too busy to take a break today.",
+        "example_translation": "Saya terlalu sibuk untuk beristirahat hari ini."
+      },
+      {
+        "word": "overtime",
+        "phonetic": "/ˈoʊvərtaɪm/",
+        "pos": "n.",
+        "translation": "lembur",
+        "example": "He worked overtime to finish the project.",
+        "example_translation": "Dia bekerja lembur untuk menyelesaikan proyek itu."
+      },
+      {
+        "word": "submit",
+        "phonetic": "/səbˈmɪt/",
+        "pos": "v.",
+        "translation": "mengirimkan; menyerahkan",
+        "example": "Please submit your report before Friday.",
+        "example_translation": "Tolong serahkan laporan Anda sebelum Jumat."
+      },
+      {
+        "word": "feedback",
+        "phonetic": "/ˈfiːdbæk/",
+        "pos": "n.",
+        "translation": "masukan; umpan balik",
+        "example": "My boss gave me useful feedback on my work.",
+        "example_translation": "Atasan saya memberi saya masukan yang berguna atas pekerjaan saya."
+      }
+    ]
+  },
+  {
+    "slug": "phrasal-b1",
+    "words": [
+      {
+        "word": "give up",
+        "phonetic": "/ɡɪv ʌp/",
+        "pos": "phr.v.",
+        "translation": "menyerah",
+        "example": "Don't give up before you finish the test.",
+        "example_translation": "Jangan menyerah sebelum kamu menyelesaikan tesnya."
+      },
+      {
+        "word": "look after",
+        "phonetic": "/lʊk ˈæftɚ/",
+        "pos": "phr.v.",
+        "translation": "menjaga, merawat",
+        "example": "She looks after her little brother every afternoon.",
+        "example_translation": "Dia menjaga adik laki-lakinya setiap sore."
+      },
+      {
+        "word": "find out",
+        "phonetic": "/faɪnd aʊt/",
+        "pos": "phr.v.",
+        "translation": "mengetahui, mencari tahu",
+        "example": "I want to find out the truth myself.",
+        "example_translation": "Saya ingin mencari tahu kebenarannya sendiri."
+      },
+      {
+        "word": "turn off",
+        "phonetic": "/tɝn ɔf/",
+        "pos": "phr.v.",
+        "translation": "mematikan",
+        "example": "Please turn off the lights before you leave.",
+        "example_translation": "Tolong matikan lampunya sebelum kamu pergi."
+      },
+      {
+        "word": "turn on",
+        "phonetic": "/tɝn ɑn/",
+        "pos": "phr.v.",
+        "translation": "menyalakan, menghidupkan",
+        "example": "Can you turn on the air conditioner now?",
+        "example_translation": "Bisakah kamu menyalakan pendingin udara sekarang?"
+      },
+      {
+        "word": "put on",
+        "phonetic": "/pʊt ɑn/",
+        "pos": "phr.v.",
+        "translation": "memakai, mengenakan",
+        "example": "Put on your jacket because it's cold outside.",
+        "example_translation": "Pakai jaketmu karena di luar dingin."
+      },
+      {
+        "word": "take off",
+        "phonetic": "/teɪk ɔf/",
+        "pos": "phr.v.",
+        "translation": "melepas; lepas landas",
+        "example": "Please take off your shoes at the door.",
+        "example_translation": "Tolong lepas sepatumu di pintu."
+      },
+      {
+        "word": "wake up",
+        "phonetic": "/weɪk ʌp/",
+        "pos": "phr.v.",
+        "translation": "bangun (tidur)",
+        "example": "I usually wake up at six every morning.",
+        "example_translation": "Saya biasanya bangun pukul enam setiap pagi."
+      },
+      {
+        "word": "get up",
+        "phonetic": "/ɡɛt ʌp/",
+        "pos": "phr.v.",
+        "translation": "bangun, beranjak berdiri",
+        "example": "He has to get up early for work.",
+        "example_translation": "Dia harus bangun pagi untuk bekerja."
+      },
+      {
+        "word": "pick up",
+        "phonetic": "/pɪk ʌp/",
+        "pos": "phr.v.",
+        "translation": "mengambil; menjemput",
+        "example": "I'll pick up the kids after school today.",
+        "example_translation": "Saya akan menjemput anak-anak sepulang sekolah hari ini."
+      },
+      {
+        "word": "throw away",
+        "phonetic": "/θroʊ əˈweɪ/",
+        "pos": "phr.v.",
+        "translation": "membuang",
+        "example": "Don't throw away those old but useful books.",
+        "example_translation": "Jangan buang buku-buku lama tapi berguna itu."
+      },
+      {
+        "word": "fill in",
+        "phonetic": "/fɪl ɪn/",
+        "pos": "phr.v.",
+        "translation": "mengisi (formulir)",
+        "example": "Please fill in this form with your name.",
+        "example_translation": "Tolong isi formulir ini dengan namamu."
+      },
+      {
+        "word": "write down",
+        "phonetic": "/raɪt daʊn/",
+        "pos": "phr.v.",
+        "translation": "mencatat, menuliskan",
+        "example": "Write down the new words in your notebook.",
+        "example_translation": "Catat kata-kata baru itu di bukumu."
+      },
+      {
+        "word": "look for",
+        "phonetic": "/lʊk fɔr/",
+        "pos": "phr.v.",
+        "translation": "mencari",
+        "example": "I'm looking for my keys all over the house.",
+        "example_translation": "Saya sedang mencari kunci saya di seluruh rumah."
+      },
+      {
+        "word": "grow up",
+        "phonetic": "/ɡroʊ ʌp/",
+        "pos": "phr.v.",
+        "translation": "tumbuh dewasa, menjadi besar",
+        "example": "I grew up in a small quiet village.",
+        "example_translation": "Saya tumbuh besar di sebuah desa kecil yang tenang."
+      },
+      {
+        "word": "break down",
+        "phonetic": "/breɪk daʊn/",
+        "pos": "phr.v.",
+        "translation": "mogok, rusak (mesin)",
+        "example": "Our old car broke down on the highway.",
+        "example_translation": "Mobil tua kami mogok di jalan tol."
+      }
+    ]
+  },
+  {
+    "slug": "academic-b2",
+    "words": [
+      {
+        "word": "analyze",
+        "phonetic": "/ˈænəˌlaɪz/",
+        "pos": "v.",
+        "translation": "menganalisis",
+        "example": "Researchers analyze the data before drawing conclusions.",
+        "example_translation": "Para peneliti menganalisis data sebelum menarik kesimpulan."
+      },
+      {
+        "word": "approach",
+        "phonetic": "/əˈproʊtʃ/",
+        "pos": "n.",
+        "translation": "pendekatan",
+        "example": "This essay takes a critical approach to the topic.",
+        "example_translation": "Esai ini mengambil pendekatan kritis terhadap topik tersebut."
+      },
+      {
+        "word": "concept",
+        "phonetic": "/ˈkɑːnsɛpt/",
+        "pos": "n.",
+        "translation": "konsep",
+        "example": "The lecture explained a difficult economic concept clearly.",
+        "example_translation": "Kuliah itu menjelaskan sebuah konsep ekonomi yang sulit dengan jelas."
+      },
+      {
+        "word": "significant",
+        "phonetic": "/sɪɡˈnɪfɪkənt/",
+        "pos": "adj.",
+        "translation": "signifikan; penting",
+        "example": "The study found a significant difference between groups.",
+        "example_translation": "Penelitian itu menemukan perbedaan yang signifikan antarkelompok."
+      },
+      {
+        "word": "evidence",
+        "phonetic": "/ˈɛvɪdəns/",
+        "pos": "n.",
+        "translation": "bukti",
+        "example": "She provided strong evidence to support her argument.",
+        "example_translation": "Dia memberikan bukti kuat untuk mendukung argumennya."
+      },
+      {
+        "word": "factor",
+        "phonetic": "/ˈfæktər/",
+        "pos": "n.",
+        "translation": "faktor",
+        "example": "Cost is an important factor in this decision.",
+        "example_translation": "Biaya adalah faktor penting dalam keputusan ini."
+      },
+      {
+        "word": "interpret",
+        "phonetic": "/ɪnˈtɜːrprət/",
+        "pos": "v.",
+        "translation": "menafsirkan",
+        "example": "Students must interpret the results of the experiment.",
+        "example_translation": "Mahasiswa harus menafsirkan hasil eksperimen tersebut."
+      },
+      {
+        "word": "demonstrate",
+        "phonetic": "/ˈdɛmənˌstreɪt/",
+        "pos": "v.",
+        "translation": "menunjukkan; membuktikan",
+        "example": "The results demonstrate a clear link between the two.",
+        "example_translation": "Hasilnya menunjukkan hubungan yang jelas antara keduanya."
+      },
+      {
+        "word": "establish",
+        "phonetic": "/ɪˈstæblɪʃ/",
+        "pos": "v.",
+        "translation": "menetapkan; membangun",
+        "example": "The researchers established a new method for testing.",
+        "example_translation": "Para peneliti menetapkan metode baru untuk pengujian."
+      },
+      {
+        "word": "framework",
+        "phonetic": "/ˈfreɪmˌwɜːrk/",
+        "pos": "n.",
+        "translation": "kerangka kerja",
+        "example": "This theory provides a useful framework for analysis.",
+        "example_translation": "Teori ini menyediakan kerangka kerja yang berguna untuk analisis."
+      },
+      {
+        "word": "hypothesis",
+        "phonetic": "/haɪˈpɑːθəsɪs/",
+        "pos": "n.",
+        "translation": "hipotesis",
+        "example": "The experiment tested the original hypothesis carefully.",
+        "example_translation": "Eksperimen itu menguji hipotesis awal dengan cermat."
+      },
+      {
+        "word": "consequently",
+        "phonetic": "/ˈkɑːnsəˌkwɛntli/",
+        "pos": "adv.",
+        "translation": "akibatnya; karena itu",
+        "example": "The funding was cut and consequently the project stopped.",
+        "example_translation": "Pendanaan dipotong dan akibatnya proyek itu berhenti."
+      },
+      {
+        "word": "consistent",
+        "phonetic": "/kənˈsɪstənt/",
+        "pos": "adj.",
+        "translation": "konsisten; selaras",
+        "example": "Her findings are consistent with earlier research.",
+        "example_translation": "Temuannya konsisten dengan penelitian sebelumnya."
+      },
+      {
+        "word": "perspective",
+        "phonetic": "/pərˈspɛktɪv/",
+        "pos": "n.",
+        "translation": "sudut pandang; perspektif",
+        "example": "The author offers a fresh perspective on history.",
+        "example_translation": "Penulis menawarkan sudut pandang baru tentang sejarah."
+      },
+      {
+        "word": "emphasize",
+        "phonetic": "/ˈɛmfəˌsaɪz/",
+        "pos": "v.",
+        "translation": "menekankan",
+        "example": "The professor emphasized the importance of citing sources.",
+        "example_translation": "Profesor itu menekankan pentingnya mengutip sumber."
+      },
+      {
+        "word": "evaluate",
+        "phonetic": "/ɪˈvæljuˌeɪt/",
+        "pos": "v.",
+        "translation": "mengevaluasi; menilai",
+        "example": "We need to evaluate the strength of each argument.",
+        "example_translation": "Kita perlu mengevaluasi kekuatan setiap argumen."
+      },
+      {
+        "word": "implication",
+        "phonetic": "/ˌɪmplɪˈkeɪʃən/",
+        "pos": "n.",
+        "translation": "implikasi; dampak",
+        "example": "The study has serious implications for public policy.",
+        "example_translation": "Penelitian itu memiliki implikasi serius bagi kebijakan publik."
+      },
+      {
+        "word": "relevant",
+        "phonetic": "/ˈrɛləvənt/",
+        "pos": "adj.",
+        "translation": "relevan; terkait",
+        "example": "Please include only relevant information in your report.",
+        "example_translation": "Tolong cantumkan hanya informasi yang relevan dalam laporanmu."
+      },
+      {
+        "word": "subsequent",
+        "phonetic": "/ˈsʌbsɪkwənt/",
+        "pos": "adj.",
+        "translation": "berikutnya; selanjutnya",
+        "example": "Subsequent studies confirmed the initial findings.",
+        "example_translation": "Penelitian berikutnya mengonfirmasi temuan awal tersebut."
+      },
+      {
+        "word": "comprehensive",
+        "phonetic": "/ˌkɑːmprɪˈhɛnsɪv/",
+        "pos": "adj.",
+        "translation": "komprehensif; menyeluruh",
+        "example": "The book gives a comprehensive overview of the field.",
+        "example_translation": "Buku itu memberikan gambaran menyeluruh tentang bidang tersebut."
+      }
+    ]
+  },
+  {
+    "slug": "business-b2",
+    "words": [
+      {
+        "word": "revenue",
+        "phonetic": "/ˈrɛvənuː/",
+        "pos": "n.",
+        "translation": "pendapatan",
+        "example": "Our annual revenue grew by ten percent last year.",
+        "example_translation": "Pendapatan tahunan kami tumbuh sepuluh persen tahun lalu."
+      },
+      {
+        "word": "profit",
+        "phonetic": "/ˈprɑːfɪt/",
+        "pos": "n.",
+        "translation": "laba; keuntungan",
+        "example": "The company made a healthy profit this quarter.",
+        "example_translation": "Perusahaan meraih laba yang sehat kuartal ini."
+      },
+      {
+        "word": "budget",
+        "phonetic": "/ˈbʌdʒɪt/",
+        "pos": "n.",
+        "translation": "anggaran",
+        "example": "We need to stay within our marketing budget.",
+        "example_translation": "Kita harus tetap dalam anggaran pemasaran kita."
+      },
+      {
+        "word": "invest",
+        "phonetic": "/ɪnˈvɛst/",
+        "pos": "v.",
+        "translation": "berinvestasi; menanam modal",
+        "example": "They decided to invest in new technology.",
+        "example_translation": "Mereka memutuskan berinvestasi pada teknologi baru."
+      },
+      {
+        "word": "negotiate",
+        "phonetic": "/nɪˈɡoʊʃieɪt/",
+        "pos": "v.",
+        "translation": "bernegosiasi; berunding",
+        "example": "We will negotiate a better price with the supplier.",
+        "example_translation": "Kami akan menegosiasikan harga yang lebih baik dengan pemasok."
+      },
+      {
+        "word": "stakeholder",
+        "phonetic": "/ˈsteɪkhoʊldər/",
+        "pos": "n.",
+        "translation": "pemangku kepentingan",
+        "example": "Every stakeholder should approve the final plan.",
+        "example_translation": "Setiap pemangku kepentingan harus menyetujui rencana akhir."
+      },
+      {
+        "word": "leverage",
+        "phonetic": "/ˈlɛvərɪdʒ/",
+        "pos": "v.",
+        "translation": "memanfaatkan",
+        "example": "We can leverage our brand to enter new markets.",
+        "example_translation": "Kita bisa memanfaatkan merek kita untuk masuk pasar baru."
+      },
+      {
+        "word": "forecast",
+        "phonetic": "/ˈfɔːrkæst/",
+        "pos": "n.",
+        "translation": "perkiraan; ramalan",
+        "example": "The sales forecast for next year looks promising.",
+        "example_translation": "Perkiraan penjualan tahun depan terlihat menjanjikan."
+      },
+      {
+        "word": "merger",
+        "phonetic": "/ˈmɜːrdʒər/",
+        "pos": "n.",
+        "translation": "merger; penggabungan perusahaan",
+        "example": "The merger created the largest firm in the industry.",
+        "example_translation": "Merger itu menciptakan perusahaan terbesar di industri ini."
+      },
+      {
+        "word": "compromise",
+        "phonetic": "/ˈkɑːmprəmaɪz/",
+        "pos": "n.",
+        "translation": "kompromi; jalan tengah",
+        "example": "Both sides reached a fair compromise after talks.",
+        "example_translation": "Kedua pihak mencapai kompromi yang adil setelah perundingan."
+      },
+      {
+        "word": "asset",
+        "phonetic": "/ˈæsɛt/",
+        "pos": "n.",
+        "translation": "aset; harta",
+        "example": "The building is the company's most valuable asset.",
+        "example_translation": "Gedung itu adalah aset paling berharga milik perusahaan."
+      },
+      {
+        "word": "liability",
+        "phonetic": "/ˌlaɪəˈbɪləti/",
+        "pos": "n.",
+        "translation": "kewajiban; utang",
+        "example": "The firm must reduce its long-term liabilities.",
+        "example_translation": "Perusahaan harus mengurangi kewajiban jangka panjangnya."
+      },
+      {
+        "word": "delegate",
+        "phonetic": "/ˈdɛlɪɡeɪt/",
+        "pos": "v.",
+        "translation": "mendelegasikan; melimpahkan",
+        "example": "Good managers delegate tasks to their team.",
+        "example_translation": "Manajer yang baik mendelegasikan tugas kepada timnya."
+      },
+      {
+        "word": "incentive",
+        "phonetic": "/ɪnˈsɛntɪv/",
+        "pos": "n.",
+        "translation": "insentif; perangsang",
+        "example": "Bonuses are a strong incentive for the staff.",
+        "example_translation": "Bonus adalah insentif yang kuat bagi para staf."
+      },
+      {
+        "word": "overhead",
+        "phonetic": "/ˈoʊvərhɛd/",
+        "pos": "n.",
+        "translation": "biaya operasional; biaya overhead",
+        "example": "We cut overhead by moving to a smaller office.",
+        "example_translation": "Kami memangkas biaya operasional dengan pindah ke kantor lebih kecil."
+      },
+      {
+        "word": "competitive",
+        "phonetic": "/kəmˈpɛtətɪv/",
+        "pos": "adj.",
+        "translation": "kompetitif; bersaing",
+        "example": "We offer very competitive prices to our clients.",
+        "example_translation": "Kami menawarkan harga yang sangat kompetitif kepada klien kami."
+      },
+      {
+        "word": "outsource",
+        "phonetic": "/ˈaʊtsɔːrs/",
+        "pos": "v.",
+        "translation": "mengalihdayakan",
+        "example": "Many firms outsource their customer support overseas.",
+        "example_translation": "Banyak perusahaan mengalihdayakan dukungan pelanggan ke luar negeri."
+      },
+      {
+        "word": "turnover",
+        "phonetic": "/ˈtɜːrnoʊvər/",
+        "pos": "n.",
+        "translation": "omzet; perputaran",
+        "example": "The store reported a record annual turnover.",
+        "example_translation": "Toko itu melaporkan omzet tahunan yang memecahkan rekor."
+      },
+      {
+        "word": "venture",
+        "phonetic": "/ˈvɛntʃər/",
+        "pos": "n.",
+        "translation": "usaha; ventura",
+        "example": "Their joint venture expanded into three new countries.",
+        "example_translation": "Usaha patungan mereka meluas ke tiga negara baru."
+      },
+      {
+        "word": "scale up",
+        "phonetic": "/ˌskeɪl ˈʌp/",
+        "pos": "phr.v.",
+        "translation": "memperbesar skala; meningkatkan skala",
+        "example": "We plan to scale up production next quarter.",
+        "example_translation": "Kami berencana memperbesar skala produksi kuartal depan."
+      },
+      {
+        "word": "acquisition",
+        "phonetic": "/ˌækwɪˈzɪʃən/",
+        "pos": "n.",
+        "translation": "akuisisi; pengambilalihan",
+        "example": "The acquisition of the startup boosted their market share.",
+        "example_translation": "Akuisisi startup itu meningkatkan pangsa pasar mereka."
+      }
+    ]
+  }
+]

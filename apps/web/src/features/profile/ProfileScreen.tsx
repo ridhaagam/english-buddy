@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { AnimatedNumber, AchGlyph, CheckIcon, ArrowRightIcon, SparkleIcon } from "../../components/ui";
+import { AnimatedNumber, AchGlyph, CheckIcon, ArrowRightIcon, SparkleIcon, KeyboardIcon, ZapIcon } from "../../components/ui";
 import { api } from "../../lib/api";
 import "./ProfileScreen.css";
 
@@ -107,6 +107,28 @@ export function ProfileScreen({ user, onStartTest, onNav }: Props) {
       )}
 
       <section className="lower">
+        <button
+          type="button"
+          className="card panel fade-up tw-cta"
+          onClick={() => onNav("typing")}
+          style={{ animationDelay: "150ms", gridColumn: "1 / -1", textAlign: "left", cursor: "pointer", border: "1px solid var(--line)" }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <div style={{ width: 52, height: 52, borderRadius: 16, background: "var(--ink)", color: "white", display: "grid", placeItems: "center", flexShrink: 0, transform: "rotate(-4deg)" }}>
+              <KeyboardIcon size={24} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <h2 className="serif" style={{ margin: 0, fontSize: 22, display: "flex", alignItems: "center", gap: 8 }}>
+                Typing trainer <span className="mono" style={{ fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", background: "var(--accent-soft)", color: "var(--accent-ink)", padding: "3px 8px", borderRadius: 999 }}>New</span>
+              </h2>
+              <p style={{ color: "var(--ink-2)", margin: "4px 0 0", fontSize: 14 }}>
+                Hear it, type it, master it — build vocabulary and speed word by word.
+              </p>
+            </div>
+            <span className="btn accent" style={{ flexShrink: 0 }}><ZapIcon size={15} /> Start typing</span>
+          </div>
+        </button>
+
         <div className="card panel fade-up" style={{ animationDelay: "180ms" }}>
           <div className="panel-head">
             <h2 className="serif" style={{ margin: 0, fontSize: 22 }}>Learning library</h2>

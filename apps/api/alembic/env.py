@@ -25,6 +25,7 @@ import app.models.session  # noqa
 import app.models.achievement  # noqa
 import app.models.audit  # noqa
 import app.models.course  # noqa
+import app.models.typing  # noqa
 
 from app.core.database import Base
 
