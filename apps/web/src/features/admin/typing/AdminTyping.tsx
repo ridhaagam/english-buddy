@@ -4,6 +4,7 @@ import {
   PlusIcon, TrashIcon, XIcon, EditIcon, CheckIcon, KeyboardIcon, PlayIcon, EyeIcon, UsersIcon,
 } from "../../../components/ui";
 import { api } from "../../../lib/api";
+import { useConfirm } from "../../../components/ConfirmDialog";
 import "./AdminTyping.css";
 
 export function AdminTyping() {
@@ -44,6 +45,7 @@ export function AdminTyping() {
 
 function DeckList({ selectedId, onSelect }: { selectedId: string | null; onSelect: (id: string | null) => void }) {
   const qc = useQueryClient();
+  const [confirm, confirmUI] = useConfirm();
   const { data: decks = [], isLoading } = useQuery({ queryKey: ["admin-typing-decks"], queryFn: api.admin.typing.listDecks });
 
   const del = useMutation({
@@ -57,6 +59,8 @@ function DeckList({ selectedId, onSelect }: { selectedId: string | null; onSelec
   if (isLoading) return <div className="card" style={{ padding: 20, color: "var(--ink-3)" }}>Loading…</div>;
 
   return (
+    <>
+    {confirmUI}
     <div className="card" style={{ padding: 0, overflow: "hidden", alignSelf: "start" }}>
       {(decks as any[]).length === 0 && (
         <p style={{ padding: 20, color: "var(--ink-3)", fontSize: 13 }}>No decks yet. Create one to get started.</p>
@@ -78,7 +82,10 @@ function DeckList({ selectedId, onSelect }: { selectedId: string | null; onSelec
             className="icon-btn atw-row-del"
             role="button"
             tabIndex={0}
-            onClick={(e) => { e.stopPropagation(); if (confirm(`Delete "${d.title}" and all its words?`)) del.mutate(d.id); }}
+            onClick={async (e) => {
+              e.stopPropagation();
+              if (await confirm({ title: "Delete deck?", message: `"${d.title}" and all its words will be permanently removed.`, confirmLabel: "Delete", variant: "danger" })) del.mutate(d.id);
+            }}
             title="Delete deck"
           >
             <TrashIcon size={13} />
@@ -86,6 +93,7 @@ function DeckList({ selectedId, onSelect }: { selectedId: string | null; onSelec
         </button>
       ))}
     </div>
+    </>
   );
 }
 
@@ -93,6 +101,7 @@ function DeckList({ selectedId, onSelect }: { selectedId: string | null; onSelec
 
 function DeckDetail({ deckId, onDeleted }: { deckId: string; onDeleted: () => void }) {
   const qc = useQueryClient();
+  const [confirm, confirmUI] = useConfirm();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
@@ -127,6 +136,8 @@ function DeckDetail({ deckId, onDeleted }: { deckId: string; onDeleted: () => vo
   const words: any[] = deck.words ?? [];
 
   return (
+    <>
+    {confirmUI}
     <div className="card" style={{ padding: "20px 24px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 14 }}>
         <div style={{ minWidth: 0 }}>
@@ -144,7 +155,7 @@ function DeckDetail({ deckId, onDeleted }: { deckId: string; onDeleted: () => vo
           </button>
           <button className="btn ghost" style={{ gap: 6 }} onClick={() => setEditOpen(true)}><EditIcon size={13} /> Edit</button>
           <button className="icon-btn" style={{ color: "oklch(0.55 0.16 25)" }} title="Delete deck"
-            onClick={() => { if (confirm(`Delete "${deck.title}" and all its words?`)) delDeck.mutate(); }}>
+            onClick={async () => { if (await confirm({ title: "Delete deck?", message: `"${deck.title}" and all its words will be permanently removed.`, confirmLabel: "Delete", variant: "danger" })) delDeck.mutate(); }}>
             <TrashIcon size={14} />
           </button>
         </div>
@@ -174,7 +185,7 @@ function DeckDetail({ deckId, onDeleted }: { deckId: string; onDeleted: () => vo
               </div>
               <button className="atw-icon" onClick={() => play(w.audio_url)} title="Play pronunciation"><PlayIcon size={13} /></button>
               <button className="atw-icon" onClick={() => setWordModal({ mode: "edit", word: w })} title="Edit"><EditIcon size={13} /></button>
-              <button className="atw-icon danger" onClick={() => { if (confirm(`Delete "${w.word}"?`)) delWord.mutate(w.id); }} title="Delete"><XIcon size={13} /></button>
+              <button className="atw-icon danger" onClick={async () => { if (await confirm({ title: "Delete word?", message: `"${w.word}" will be removed from this deck.`, confirmLabel: "Delete", variant: "danger" })) delWord.mutate(w.id); }} title="Delete"><XIcon size={13} /></button>
             </div>
           ))}
         </div>
@@ -190,6 +201,7 @@ function DeckDetail({ deckId, onDeleted }: { deckId: string; onDeleted: () => vo
         />
       )}
     </div>
+    </>
   );
 }
 

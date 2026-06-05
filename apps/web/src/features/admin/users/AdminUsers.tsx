@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { PlusIcon, TrashIcon, XIcon, ArrowRightIcon } from "../../../components/ui";
 import { api } from "../../../lib/api";
+import { useConfirm } from "../../../components/ConfirmDialog";
 import "./AdminUsers.css";
 
 const STAFF_ROLES = ["editor", "admin", "owner"];
@@ -51,9 +52,11 @@ function StaffTab() {
     mutationFn: (id: string) => api.admin.users.delete(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-users"] }),
   });
+  const [confirm, confirmUI] = useConfirm();
 
   return (
     <>
+      {confirmUI}
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
         <button className="btn accent" onClick={() => setOpen(true)}>
           <PlusIcon size={14} /> Add staff
@@ -86,7 +89,7 @@ function StaffTab() {
                 <td data-label="Joined" style={{ ...tdStyle, color: "var(--ink-3)", fontSize: 13 }}>{u.created_at ? new Date(u.created_at).toLocaleDateString() : "—"}</td>
                 <td data-label="XP" style={tdStyle}><span className="mono" style={{ fontSize: 12, color: "var(--accent-ink)" }}>{(u.xp_total ?? 0).toLocaleString()}</span></td>
                 <td style={{ ...tdStyle, textAlign: "right" }}>
-                  <button className="icon-btn" onClick={() => { if (confirm(`Delete ${u.display_name}?`)) del.mutate(u.id); }}>
+                  <button className="icon-btn" onClick={async () => { if (await confirm({ title: "Delete user?", message: `${u.display_name} will be permanently removed.`, confirmLabel: "Delete", variant: "danger" })) del.mutate(u.id); }}>
                     <TrashIcon size={14} />
                   </button>
                 </td>
@@ -157,9 +160,11 @@ function LearnersTab() {
       api.admin.users.patchLearner(id, { require_camera }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-learners"] }),
   });
+  const [confirm, confirmUI] = useConfirm();
 
   return (
     <>
+      {confirmUI}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, gap: 12 }}>
         <input
           value={search}
@@ -213,7 +218,7 @@ function LearnersTab() {
                   </label>
                 </td>
                 <td style={{ ...tdStyle, textAlign: "right" }}>
-                  <button className="icon-btn" onClick={() => { if (confirm(`Delete ${u.display_name}?`)) del.mutate(u.id); }}>
+                  <button className="icon-btn" onClick={async () => { if (await confirm({ title: "Delete user?", message: `${u.display_name} will be permanently removed.`, confirmLabel: "Delete", variant: "danger" })) del.mutate(u.id); }}>
                     <TrashIcon size={14} />
                   </button>
                 </td>

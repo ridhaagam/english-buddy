@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { PlusIcon, TrashIcon, XIcon, EditIcon, UsersIcon, BookOpenIcon, CheckIcon, LayersIcon } from "../../../components/ui";
 import { api } from "../../../lib/api";
+import { useConfirm } from "../../../components/ConfirmDialog";
 import "./AdminCourses.css";
 
 export function AdminCourses() {
@@ -46,6 +47,7 @@ export function AdminCourses() {
 
 function CourseList({ selectedId, onSelect }: { selectedId: string | null; onSelect: (id: string) => void }) {
   const qc = useQueryClient();
+  const [confirm, confirmUI] = useConfirm();
   const { data: courses = [], isLoading } = useQuery({ queryKey: ["admin-courses"], queryFn: api.admin.courses.list });
 
   const del = useMutation({
@@ -59,6 +61,8 @@ function CourseList({ selectedId, onSelect }: { selectedId: string | null; onSel
   if (isLoading) return <div className="card" style={{ padding: 20, color: "var(--ink-3)" }}>Loading…</div>;
 
   return (
+    <>
+    {confirmUI}
     <div className="card" style={{ padding: 0, overflow: "hidden" }}>
       {(courses as any[]).length === 0 && (
         <p style={{ padding: 20, color: "var(--ink-3)", fontSize: 13 }}>No courses yet. Create one to get started.</p>
@@ -86,7 +90,7 @@ function CourseList({ selectedId, onSelect }: { selectedId: string | null; onSel
             <button
               className="icon-btn"
               style={{ flexShrink: 0, color: "var(--ink-3)", fontSize: 11 }}
-              onClick={(e) => { e.stopPropagation(); if (confirm(`Delete "${c.title}"?`)) del.mutate(c.id); }}
+              onClick={async (e) => { e.stopPropagation(); if (await confirm({ title: "Delete course?", message: `"${c.title}" will be removed. Its modules and learners stay; only the grouping is deleted.`, confirmLabel: "Delete", variant: "danger" })) del.mutate(c.id); }}
               title="Delete course"
             >
               <TrashIcon size={13} />
@@ -95,6 +99,7 @@ function CourseList({ selectedId, onSelect }: { selectedId: string | null; onSel
         </button>
       ))}
     </div>
+    </>
   );
 }
 

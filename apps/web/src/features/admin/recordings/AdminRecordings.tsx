@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { FlagIcon, CheckIcon, XIcon, ImportIcon, PlayIcon } from "../../../components/ui";
 import { api } from "../../../lib/api";
+import { useConfirm } from "../../../components/ConfirmDialog";
 import "./AdminRecordings.css";
 
 type AnswerEdit = { flagged: boolean; admin_comment: string };
@@ -22,6 +23,7 @@ export function AdminResults() {
   const [hasSaved,    setHasSaved]    = useState(false);
   const [savingAll,   setSavingAll]   = useState(false);
   const [warnDiscard, setWarnDiscard] = useState(false);
+  const [confirm, confirmUI] = useConfirm();
 
   async function openResult(r: any) {
     setViewing(r);
@@ -109,6 +111,7 @@ export function AdminResults() {
 
   return (
     <div className="container res-page">
+      {confirmUI}
 
       {/* ── Page header ── */}
       <header className="res-page-head">
@@ -129,7 +132,7 @@ export function AdminResults() {
             const a    = document.createElement("a");
             a.href = url; a.download = "results.csv"; a.click();
             URL.revokeObjectURL(url);
-          } catch (err: any) { alert(err.message || "Export failed"); }
+          } catch (err: any) { await confirm({ title: "Export failed", message: err.message || "Could not export the CSV.", confirmLabel: "OK", hideCancel: true }); }
         }}>
           <ImportIcon size={14} /> Export CSV
         </button>
