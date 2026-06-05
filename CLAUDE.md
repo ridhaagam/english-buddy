@@ -138,3 +138,25 @@ Key variables: `SECRET_KEY`, `DATABASE_URL`, `REDIS_URL`, `FILES_ROOT`, `CORS_OR
 - No inline `style={{ ... }}` for anything that repeats — use a CSS class
 - No `useEffect` for derived values — compute them inline or with `useMemo`
 - No N+1 queries in backend routes — batch with JOINs or subqueries
+
+---
+
+## Domain gotchas (areas that have bitten us)
+
+These are invariants to preserve — each one was a real bug at some point.
+
+### Daily streak
+- The streak is keyed on `User.streak_day` (a `Date`), **not** `last_seen_at`. Login and `/me` activity bump `last_seen_at` to today, so any streak rule based on `last_seen_at < today` freezes the streak. Use the shared helper `app/services/streak.py::apply_daily_streak(user, today)` in every finish path (`sessions.py`, `typing.py`). Same day = no-op, consecutive day = +1, gap ≥ 2 = reset to 1.
+- The streak increment path **cannot** be verified over HTTP (needs a real day boundary) — unit-test the pure helper with injected dates, or manipulate `streak_day` in the DB.
+
+### XP
+- Always award XP with an **atomic** SQL update: `update(User).where(...).values(xp_total=User.xp_total + xp)`. Never `user.xp_total += xp` (lost updates on concurrent finishes).
+- Formulas (intentionally not equal): quiz = `40·correct + 10·answered + 60 if 100%`; typing = `8·correct + 4·words + 40 if all clean`. A typing word that was *revealed* (peeked) earns base XP but forfeits the perfect bonus and is not mastered.
+
+### Learner content access
+- Learners see modules via **`GET /library`** (filters by `ModuleAssignment` + course enrollment via `CourseUser`/`CourseModule`). The legacy **`GET /modules` is unfiltered** — never use it for learner-facing lists.
+- Session creation (`POST /sessions`) re-checks access (403) — a list filter alone is bypassable by deep-link.
+- Typing decks are **hidden until assigned**: `DeckAssignment` gates `GET /typing/decks`, deck detail, chapters, and `POST /typing/sessions`. Staff (admin/owner/editor) bypass the gate to preview. Review mode and the per-word audio endpoint are intentionally **un**gated.
+
+### UI dialogs
+- Never use `window.confirm` / `alert` / `prompt`. Use `useConfirm()` from `apps/web/src/components/ConfirmDialog.tsx` (`const [confirm, confirmUI] = useConfirm()` → `await confirm({ title, message, variant: "danger" })`, render `{confirmUI}`).
