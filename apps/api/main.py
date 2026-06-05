@@ -27,6 +27,7 @@ from app.api.admin.import_doc import router as import_doc_router
 from app.api.admin.import_audio import router as import_audio_router
 from app.api.admin.audit import router as admin_audit_router
 from app.api.admin.courses import router as admin_courses_router
+from app.api.admin.typing import router as admin_typing_router
 
 PREFIX = "/api/v1"
 
@@ -44,6 +45,7 @@ app.include_router(import_doc_router, prefix=PREFIX)
 app.include_router(import_audio_router, prefix=PREFIX)
 app.include_router(admin_audit_router, prefix=PREFIX)
 app.include_router(admin_courses_router, prefix=PREFIX)
+app.include_router(admin_typing_router, prefix=PREFIX)
 
 
 @app.get("/health")

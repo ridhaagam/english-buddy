@@ -1,0 +1,81 @@
+.tsd { padding-top: 24px; padding-bottom: 48px; }
+
+/* ---- Header -------------------------------------------------------------- */
+.tsd-head { display: flex; align-items: center; gap: 18px; padding: 22px 24px; }
+.tsd-head-mark {
+  width: 52px; height: 52px; border-radius: 16px; flex-shrink: 0;
+  display: grid; place-items: center; background: var(--ink); color: white;
+  box-shadow: 0 10px 24px -12px oklch(0.18 0.01 85 / 0.5); transform: rotate(-4deg);
+}
+.tsd-head-meta { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; font-size: 13px; color: var(--ink-3); }
+.tsd-pill {
+  font-size: 11px; padding: 3px 9px; border-radius: 999px;
+  background: var(--bg-2); border: 1px solid var(--line-2); color: var(--ink-2);
+}
+
+/* ---- Stat row ------------------------------------------------------------ */
+.tsd-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 16px 0; }
+.tsd-stat {
+  padding: 16px 14px; border-radius: var(--r-md);
+  background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-sm);
+  display: flex; flex-direction: column; gap: 4px;
+}
+.tsd-stat.accent { background: var(--accent-soft); border-color: transparent; }
+.tsd-stat-val { font-size: 24px; letter-spacing: -0.02em; line-height: 1; color: var(--ink); display: inline-flex; align-items: center; gap: 5px; }
+.tsd-stat.accent .tsd-stat-val { color: var(--accent-ink); }
+.tsd-stat-lbl { font-size: 10px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; }
+
+/* ---- Word breakdown ------------------------------------------------------ */
+.tsd-words { padding: 20px 22px; }
+.tsd-words-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.tsd-peek-note {
+  display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600;
+  padding: 3px 10px; border-radius: 999px;
+  background: oklch(0.96 0.05 85); color: oklch(0.46 0.1 85); border: 1px solid oklch(0.86 0.08 85);
+}
+
+.tsd-word-list { display: flex; flex-direction: column; gap: 7px; }
+.tsd-word {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 14px; border-radius: var(--r-md);
+  background: var(--bg-2); border: 1px solid var(--line-2);
+  transition: border-color 0.15s, background 0.15s;
+}
+.tsd-word.clean  { border-left: 3px solid var(--accent); }
+.tsd-word.peeked { border-left: 3px solid oklch(0.72 0.12 85); }
+.tsd-word.wrong  { border-left: 3px solid oklch(0.62 0.16 25); }
+
+.tsd-word-ico {
+  width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+  display: grid; place-items: center;
+}
+.tsd-word-ico.clean  { background: var(--accent-soft); color: var(--accent-ink); }
+.tsd-word-ico.peeked { background: oklch(0.95 0.06 85); color: oklch(0.45 0.1 85); }
+.tsd-word-ico.wrong  { background: oklch(0.95 0.04 25); color: oklch(0.5 0.12 25); }
+
+.tsd-word-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.tsd-word-top { display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap; }
+.tsd-word-text { font-size: 15.5px; font-weight: 600; color: var(--ink); letter-spacing: -0.01em; }
+.tsd-word-phon { font-size: 12px; color: var(--ink-3); }
+.tsd-word-tr { font-size: 12.5px; color: var(--ink-2); }
+
+.tsd-word-tag {
+  flex-shrink: 0; font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+  padding: 3px 9px; border-radius: 999px;
+}
+.tsd-word-tag.clean  { background: var(--accent-soft); color: var(--accent-ink); }
+.tsd-word-tag.peeked { background: oklch(0.95 0.06 85); color: oklch(0.45 0.1 85); }
+.tsd-word-tag.wrong  { background: oklch(0.95 0.04 25); color: oklch(0.5 0.12 25); }
+
+.tsd-word-play {
+  flex-shrink: 0; width: 30px; height: 30px; border-radius: 9px; cursor: pointer;
+  display: grid; place-items: center;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink-2);
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.tsd-word-play:hover { background: var(--ink); color: white; border-color: var(--ink); }
+
+@media (max-width: 600px) {
+  .tsd-stats { grid-template-columns: repeat(2, 1fr); }
+  .tsd-word-tag { display: none; }
+}

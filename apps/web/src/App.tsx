@@ -22,10 +22,12 @@ import { ProfileEditPage } from "./features/profile/ProfileEditPage";
 import { SessionDetailPage } from "./features/practice/SessionDetailPage";
 import { TypingHome, type TypingLaunch } from "./features/typing/TypingHome";
 import { TypingPractice } from "./features/typing/TypingPractice";
+import { TypingSessionDetail } from "./features/typing/TypingSessionDetail";
+import { AdminTyping } from "./features/admin/typing/AdminTyping";
 import { api } from "./lib/api";
 import "./App.css";
 
-type AppRoute = "profile" | "library" | "practice" | "test" | "results" | "admin" | "profile-edit" | "session-detail" | "typing" | "typing-practice";
+type AppRoute = "profile" | "library" | "practice" | "test" | "results" | "admin" | "profile-edit" | "session-detail" | "typing" | "typing-practice" | "typing-session-detail";
 
 export function App() {
   const queryClient = useQueryClient();
@@ -36,6 +38,7 @@ export function App() {
   const [result, setResult] = useState<any>(null);
   const [adminMode, setAdminMode] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState<string | undefined>(undefined);
+  const [selectedTypingSessionId, setSelectedTypingSessionId] = useState<string | undefined>(undefined);
   const [typingLaunch, setTypingLaunch] = useState<TypingLaunch | null>(null);
   const [typingRunKey, setTypingRunKey] = useState(0);
   const [testResumeData, setTestResumeData] = useState<{ answeredQuestionIds: string[]; previousSessionId: string } | undefined>(undefined);
@@ -180,6 +183,7 @@ export function App() {
             case "results": return <AdminResults />;
             case "reports": return <AdminReports />;
             case "users": return <AdminUsers />;
+            case "typing": return <AdminTyping />;
             case "audit-log": return isOwner ? <AdminAuditLog /> : <AdminDashboard />;
             case "face-test": return isOwner ? <AdminFaceTest /> : <AdminDashboard />;
             default: return <AdminDashboard />;
@@ -216,6 +220,8 @@ export function App() {
           <PracticeScreen
             onStartTest={(id) => startTest(id)}
             onViewSession={(id) => { setSelectedSessionId(id); setRoute("session-detail"); }}
+            onViewTypingSession={(id) => { setSelectedTypingSessionId(id); setRoute("typing-session-detail"); }}
+            onStartTyping={() => setRoute("typing")}
           />
         )}
         {route === "session-detail" && selectedSessionId && (
@@ -223,6 +229,12 @@ export function App() {
             sessionId={selectedSessionId}
             onBack={() => setRoute("practice")}
             onPracticeAgain={(moduleId) => startTest(moduleId)}
+          />
+        )}
+        {route === "typing-session-detail" && selectedTypingSessionId && (
+          <TypingSessionDetail
+            sessionId={selectedTypingSessionId}
+            onBack={() => setRoute("practice")}
           />
         )}
         {route === "profile-edit" && (

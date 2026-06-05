@@ -192,6 +192,9 @@ export const LayersIcon = ({ size = 16 }: { size?: number }) => (
 export const KeyboardIcon = ({ size = 16 }: { size?: number }) => (
   <IconBase size={size}><rect x="2" y="5" width="20" height="14" rx="2.5" /><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 13h.01M18 13h.01M9 13h6" /></IconBase>
 );
+export const EyeIcon = ({ size = 16 }: { size?: number }) => (
+  <IconBase size={size}><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></IconBase>
+);
 
 // ----- Topbar ---------------------------------------------------------------
 type TopbarProps = {

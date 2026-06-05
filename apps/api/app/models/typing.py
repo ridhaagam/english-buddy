@@ -70,6 +70,25 @@ class TypingSession(Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class TypingAnswer(Base):
+    """Per-word outcome of a single typing session — backs the practice-history detail.
+
+    ``TypingSession`` only keeps aggregates; this records what happened to each word
+    in that one run (typed clean? revealed/peeked?) so a learner can review a past
+    session word by word. Written once when the session finishes.
+    """
+
+    __tablename__ = "english_typing_answers"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    session_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("english_typing_sessions.id", ondelete="CASCADE"), nullable=False, index=True)
+    word_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("english_words.id", ondelete="CASCADE"), nullable=False, index=True)
+    position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    correct: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    revealed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class WordProgress(Base):
     """Per-user, per-word mastery — backs the wrong-word book and mastered counts."""
 

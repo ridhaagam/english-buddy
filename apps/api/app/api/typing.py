@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.deps import CurrentUser
 from app.core.security import decode_token
-from app.models.typing import TypingSession, Word, WordDeck, WordProgress
+from app.models.typing import TypingAnswer, TypingSession, Word, WordDeck, WordProgress
 from app.models.user import User
 from app.services.storage import get_file_path
 from app.services.word_audio import ensure_word_audio
@@ -238,6 +238,10 @@ class StartTypingBody(BaseModel):
 class TypingResult(BaseModel):
     word_id: str
     correct: bool
+    # Set when the learner peeked at the spelling in dictation mode. Self-reported —
+    # lying only hurts the learner (no mastery, stays in review), so it isn't an
+    # exploit surface like the scored fields are.
+    revealed: bool = False
 
 
 class FinishTypingBody(BaseModel):
@@ -329,21 +333,33 @@ async def finish_typing_session(
         }
 
     # ── Score server-side from validated outcomes (don't trust the body) ──────
+    # Keep word order (for per-word answer rows) while de-duplicating: typing the
+    # same word twice in one run collapses to one outcome (last typed wins; any
+    # peek sticks). Words outside the session's legitimate set are ignored.
     allowed = await _allowed_word_ids(db, user.id, session)
-    outcome: dict[UUID, bool] = {}
+    order: list[UUID] = []
+    outcome: dict[UUID, dict] = {}
     for r in body.results:
         try:
             wid = UUID(r.word_id)
         except ValueError:
             continue
-        if wid in allowed:
-            outcome[wid] = r.correct  # last write wins per word
+        if wid not in allowed:
+            continue
+        if wid not in outcome:
+            outcome[wid] = {"correct": r.correct, "revealed": r.revealed}
+            order.append(wid)
+        else:
+            outcome[wid]["correct"] = r.correct
+            outcome[wid]["revealed"] = outcome[wid]["revealed"] or r.revealed
 
-    total = len(outcome)
-    correct = sum(1 for v in outcome.values() if v)
+    total = len(order)
+    # "clean" = typed with no errors AND not peeked. Mastery and the perfect bonus
+    # require clean; a peeked word still earns its base XP but never counts as known.
+    correct = sum(1 for v in outcome.values() if v["correct"])
+    clean = sum(1 for v in outcome.values() if v["correct"] and not v["revealed"])
     word_accuracy = round(correct / total * 100) if total else 0
-    # Same scale as quiz sessions; perfect bonus only when every word is clean.
-    xp = 8 * correct + 4 * total + (40 if total > 0 and correct == total else 0)
+    xp = 8 * correct + 4 * total + (40 if total > 0 and clean == total else 0)
 
     session.total = total
     session.correct = correct
@@ -354,19 +370,26 @@ async def finish_typing_session(
     session.xp_earned = xp
     session.finished_at = datetime.now(timezone.utc)
 
-    # ── Per-word mastery via upsert (race-safe against the unique constraint) ─
+    # ── Per-word answer rows (history detail) + mastery upsert ────────────────
     now = datetime.now(timezone.utc)
-    for wid, was_correct in outcome.items():
+    for pos, wid in enumerate(order):
+        v = outcome[wid]
+        is_clean = v["correct"] and not v["revealed"]
+        db.add(TypingAnswer(
+            session_id=session.id, word_id=wid, position=pos,
+            correct=v["correct"], revealed=v["revealed"],
+        ))
+        # Race-safe against the unique constraint; peeked words drop to the review book.
         stmt = pg_insert(WordProgress).values(
             user_id=user.id, word_id=wid, seen_count=1,
-            wrong_count=0 if was_correct else 1,
-            mastered=was_correct, last_practiced_at=now,
+            wrong_count=0 if is_clean else 1,
+            mastered=is_clean, last_practiced_at=now,
         ).on_conflict_do_update(
             constraint="uq_word_progress_user_word",
             set_={
                 "seen_count": WordProgress.seen_count + 1,
-                "wrong_count": WordProgress.wrong_count + (0 if was_correct else 1),
-                "mastered": was_correct,
+                "wrong_count": WordProgress.wrong_count + (0 if is_clean else 1),
+                "mastered": is_clean,
                 "last_practiced_at": now,
             },
         )
@@ -387,6 +410,90 @@ async def finish_typing_session(
 
     await db.commit()
     return {"xp_earned": xp, "wpm": session.wpm, "accuracy": word_accuracy, "correct": correct, "total": total}
+
+
+# ── Practice history ─────────────────────────────────────────────────────────
+
+
+@router.get("/typing/sessions/me")
+async def my_typing_sessions(
+    user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    limit: int = Query(50, ge=1, le=200),
+):
+    rows_r = await db.execute(
+        select(TypingSession, WordDeck.title)
+        .join(WordDeck, WordDeck.id == TypingSession.deck_id, isouter=True)
+        .where(and_(TypingSession.user_id == user.id, TypingSession.finished_at.isnot(None)))
+        .order_by(TypingSession.finished_at.desc())
+        .limit(limit)
+    )
+    out = []
+    for s, deck_title in rows_r.all():
+        out.append({
+            "id": str(s.id),
+            "deck_title": deck_title or ("Review" if s.mode == "review" else "Typing"),
+            "mode": s.mode,
+            "chapter_index": s.chapter_index,
+            "total": s.total,
+            "correct": s.correct,
+            "accuracy": s.accuracy,
+            "wpm": s.wpm,
+            "xp_earned": s.xp_earned,
+            "finished_at": s.finished_at.isoformat() if s.finished_at else None,
+        })
+    return out
+
+
+@router.get("/typing/sessions/me/{session_id}")
+async def my_typing_session_detail(
+    session_id: UUID,
+    user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    s_r = await db.execute(
+        select(TypingSession, WordDeck.title)
+        .join(WordDeck, WordDeck.id == TypingSession.deck_id, isouter=True)
+        .where(and_(TypingSession.id == session_id, TypingSession.user_id == user.id))
+    )
+    row = s_r.first()
+    if not row:
+        raise HTTPException(404, "Session not found")
+    s, deck_title = row
+
+    # Per-word answers — empty for sessions recorded before this feature existed,
+    # in which case the client falls back to the aggregate stats below.
+    ans_r = await db.execute(
+        select(TypingAnswer, Word)
+        .join(Word, Word.id == TypingAnswer.word_id)
+        .where(TypingAnswer.session_id == session_id)
+        .order_by(TypingAnswer.position)
+    )
+    words = [
+        {
+            "word": w.word,
+            "phonetic": w.phonetic,
+            "translation": w.translation,
+            "correct": a.correct,
+            "revealed": a.revealed,
+            "audio_url": f"/api/v1/typing/words/{w.id}/audio",
+        }
+        for a, w in ans_r.all()
+    ]
+    return {
+        "id": str(s.id),
+        "deck_title": deck_title or ("Review" if s.mode == "review" else "Typing"),
+        "mode": s.mode,
+        "chapter_index": s.chapter_index,
+        "total": s.total,
+        "correct": s.correct,
+        "accuracy": s.accuracy,
+        "wpm": s.wpm,
+        "duration_ms": s.duration_ms,
+        "xp_earned": s.xp_earned,
+        "finished_at": s.finished_at.isoformat() if s.finished_at else None,
+        "words": words,
+    }
 
 
 # ── Stats ────────────────────────────────────────────────────────────────────

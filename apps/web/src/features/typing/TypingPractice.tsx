@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../lib/api";
 import {
   XIcon, ZapIcon, ClockIcon, CheckIcon, ArrowRightIcon, PlayIcon, ArrowLeftIcon,
-  TrophyIcon, KeyboardIcon,
+  TrophyIcon, KeyboardIcon, EyeIcon,
 } from "../../components/ui";
 import { sfx, getSoundSettings, setSoundSettings, primeAudio } from "./sounds";
 import type { TypingLaunch } from "./TypingHome";
@@ -39,9 +39,10 @@ export function TypingPractice({
 
   const typedRef = useRef(0); // synchronous cursor so batched input advances correctly
   const wordErrorsRef = useRef(0);
+  const wordRevealedRef = useRef(false); // did the learner peek at THIS word's spelling?
   const correctKeysRef = useRef(0);
   const wrongKeysRef = useRef(0);
-  const resultsRef = useRef<{ word_id: string; correct: boolean }[]>([]);
+  const resultsRef = useRef<{ word_id: string; correct: boolean; revealed: boolean }[]>([]);
   const startRef = useRef<number | null>(null);
   const doneRef = useRef(false);
 
@@ -99,6 +100,7 @@ export function TypingPractice({
   useEffect(() => {
     if (phase !== "playing") return;
     setRevealed(false);
+    wordRevealedRef.current = false;
     const t = setTimeout(playAudio, 220);
     return () => clearTimeout(t);
   }, [idx, phase, playAudio]);
@@ -154,9 +156,11 @@ export function TypingPractice({
       const nextTyped = pos + 1;
       typedRef.current = nextTyped;
       if (nextTyped >= w.word.length) {
-        // Word complete.
-        resultsRef.current.push({ word_id: w.id, correct: wordErrorsRef.current === 0 });
+        // Word complete. A peeked word is recorded as not-clean (revealed) even if
+        // typed without errors — the server keeps it out of mastery and XP perfect bonus.
+        resultsRef.current.push({ word_id: w.id, correct: wordErrorsRef.current === 0, revealed: wordRevealedRef.current });
         wordErrorsRef.current = 0;
+        wordRevealedRef.current = false;
         setBurst((b) => b + 1);
         sfx.correct();
         if (idx + 1 >= words.length) {
@@ -331,7 +335,9 @@ export function TypingPractice({
 
         <div className="tp-below">
           {isDictation && !revealed ? (
-            <button className="tp-reveal" onClick={() => setRevealed(true)}>Reveal word</button>
+            <button className="tp-reveal" onClick={() => { setRevealed(true); wordRevealedRef.current = true; }}>
+              <EyeIcon size={14} /> Reveal word
+            </button>
           ) : (
             <>
               {current?.translation && <p className="tp-translation">{current.translation}</p>}
@@ -369,16 +375,20 @@ function Results({
 }: {
   launch: TypingLaunch;
   words: TWord[];
-  results: { word_id: string; correct: boolean }[];
+  results: { word_id: string; correct: boolean; revealed: boolean }[];
   stats: { wpm: number; accuracy: number; durationMs: number; correctWords: number };
   earnedXp: number | null;
   onExit: () => void;
   onRedo: () => void;
   onNext?: () => void;
 }) {
-  const correctSet = useMemo(() => new Set(results.filter((r) => r.correct).map((r) => r.word_id)), [results]);
-  const missed = words.filter((w) => !correctSet.has(w.id));
-  const perfect = missed.length === 0;
+  // "clean" = typed right AND not peeked. Anything else (wrong or revealed) is what
+  // lands in the review book — mirrors the server's mastery rule exactly.
+  const cleanSet = useMemo(() => new Set(results.filter((r) => r.correct && !r.revealed).map((r) => r.word_id)), [results]);
+  const peekedSet = useMemo(() => new Set(results.filter((r) => r.revealed).map((r) => r.word_id)), [results]);
+  const review = words.filter((w) => !cleanSet.has(w.id));
+  const perfect = review.length === 0;
+  const cleanCount = cleanSet.size;
   const seconds = Math.round(stats.durationMs / 1000);
 
   return (
@@ -389,7 +399,7 @@ function Results({
         </div>
         <h2 className="serif tp-result-title">{perfect ? "Flawless run!" : "Chapter complete"}</h2>
         <p className="tp-result-sub">
-          {perfect ? "Every word, zero mistakes. Beautiful typing." : `${stats.correctWords} of ${words.length} words typed clean.`}
+          {perfect ? "Every word, zero mistakes, no peeking. Beautiful typing." : `${cleanCount} of ${words.length} words nailed clean.`}
         </p>
 
         <div className="tp-result-stats">
@@ -399,13 +409,18 @@ function Results({
           {earnedXp !== null && <ResStat value={`+${earnedXp}`} label="XP" accent />}
         </div>
 
-        {missed.length > 0 && (
+        {review.length > 0 && (
           <div className="tp-missed">
             <p className="eyebrow">Added to your review book</p>
             <div className="tp-missed-list">
-              {missed.map((w) => (
-                <span key={w.id} className="tp-missed-chip">{w.word}</span>
-              ))}
+              {review.map((w) => {
+                const peeked = peekedSet.has(w.id);
+                return (
+                  <span key={w.id} className={`tp-missed-chip${peeked ? " peeked" : ""}`} title={peeked ? "You revealed this word" : "Typed with a mistake"}>
+                    {peeked && <EyeIcon size={12} />}{w.word}
+                  </span>
+                );
+              })}
             </div>
           </div>
         )}

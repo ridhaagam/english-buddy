@@ -186,12 +186,14 @@ export const api = {
       request<{ id: string }>("/typing/sessions", { method: "POST", body: JSON.stringify(body) }),
     finish: (sessionId: string, body: {
       total: number; correct: number; wrong_count?: number; accuracy?: number;
-      wpm?: number; duration_ms?: number; results?: { word_id: string; correct: boolean }[];
+      wpm?: number; duration_ms?: number; results?: { word_id: string; correct: boolean; revealed?: boolean }[];
     }) =>
       request<{ xp_earned: number; wpm: number; accuracy: number; correct: number; total: number }>(
         `/typing/sessions/${sessionId}/finish`,
         { method: "POST", body: JSON.stringify(body) }
       ),
+    sessionsMine: () => request<any[]>("/typing/sessions/me"),
+    session: (id: string) => request<any>(`/typing/sessions/me/${id}`),
     wordAudio: (wordId: string) => {
       const token = localStorage.getItem("access_token");
       return `${BASE}/typing/words/${wordId}/audio${token ? `?token=${token}` : ""}`;
@@ -296,6 +298,20 @@ export const api = {
         const q = params ? "?" + new URLSearchParams(Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)]))).toString() : "";
         return request<{ entries: any[] }>(`/admin/audit-log${q}`);
       },
+    },
+    typing: {
+      listDecks: () => request<any[]>("/admin/typing/decks"),
+      getDeck: (id: string) => request<any>(`/admin/typing/decks/${id}`),
+      createDeck: (data: { title: string; description?: string; cefr_level?: string; accent?: string; is_published?: boolean }) =>
+        request<any>("/admin/typing/decks", { method: "POST", body: JSON.stringify(data) }),
+      updateDeck: (id: string, data: { title?: string; description?: string; cefr_level?: string; accent?: string; is_published?: boolean; sort_order?: number }) =>
+        request<any>(`/admin/typing/decks/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+      deleteDeck: (id: string) => request<void>(`/admin/typing/decks/${id}`, { method: "DELETE" }),
+      addWord: (deckId: string, data: { word: string; phonetic?: string; pos?: string; translation?: string; example?: string; example_translation?: string }) =>
+        request<any>(`/admin/typing/decks/${deckId}/words`, { method: "POST", body: JSON.stringify(data) }),
+      updateWord: (wordId: string, data: { word: string; phonetic?: string; pos?: string; translation?: string; example?: string; example_translation?: string }) =>
+        request<any>(`/admin/typing/words/${wordId}`, { method: "PATCH", body: JSON.stringify(data) }),
+      deleteWord: (wordId: string) => request<void>(`/admin/typing/words/${wordId}`, { method: "DELETE" }),
     },
     courses: {
       list: () => request<any[]>("/admin/courses"),

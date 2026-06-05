@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { Logo, ShieldIcon, BarChartIcon, BookOpenIcon, MicIcon, VideoIcon, UsersIcon, HomeIcon, ArrowRightIcon, ImportIcon, FlagIcon, LayersIcon } from "../../components/ui";
+import { Logo, ShieldIcon, BarChartIcon, BookOpenIcon, MicIcon, VideoIcon, UsersIcon, HomeIcon, ArrowRightIcon, ImportIcon, FlagIcon, LayersIcon, KeyboardIcon } from "../../components/ui";
 import "./AdminShell.css";
 
-type AdminRoute = "dashboard" | "modules" | "courses" | "import-doc" | "import-audio" | "results" | "reports" | "users" | "audit-log" | "face-test";
+type AdminRoute = "dashboard" | "modules" | "courses" | "import-doc" | "import-audio" | "results" | "reports" | "users" | "typing" | "audit-log" | "face-test";
 
 type Props = {
   user: any;
@@ -20,6 +20,7 @@ const NAV_ITEMS: { id: AdminRoute; label: string; icon: React.ReactNode; ownerOn
   { id: "results",      label: "Results",    icon: <VideoIcon size={16} /> },
   { id: "reports",      label: "Reports",    icon: <BarChartIcon size={16} /> },
   { id: "users",        label: "Users",      icon: <UsersIcon size={16} /> },
+  { id: "typing",       label: "Typing",     icon: <KeyboardIcon size={16} /> },
   { id: "audit-log",    label: "Audit log",  icon: <FlagIcon size={16} />, ownerOnly: true },
   { id: "face-test",    label: "Face test",  icon: <VideoIcon size={16} />, ownerOnly: true },
 ];

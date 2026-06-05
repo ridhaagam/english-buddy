@@ -111,6 +111,7 @@
 .tp-example { margin: 0; font-size: 14.5px; color: var(--ink-2); max-width: 56ch; line-height: 1.6; }
 .tp-example-id { color: var(--ink-3); }
 .tp-reveal {
+  display: inline-flex; align-items: center; gap: 6px;
   border: 1px dashed var(--line); background: var(--surface); color: var(--ink-2);
   padding: 8px 16px; border-radius: 999px; cursor: pointer; font-size: 13px; font-weight: 600;
   transition: background 0.15s, border-color 0.15s;
@@ -157,8 +158,13 @@
 .tp-missed .eyebrow { display: block; margin-bottom: 8px; }
 .tp-missed-list { display: flex; flex-wrap: wrap; gap: 6px; }
 .tp-missed-chip {
+  display: inline-flex; align-items: center; gap: 5px;
   font-family: var(--font-mono); font-size: 13px; padding: 5px 11px; border-radius: 999px;
   background: var(--rose-soft); color: oklch(0.45 0.13 25); border: 1px solid oklch(0.88 0.06 25);
+}
+/* Peeked words read as "you chose to look", not "you got it wrong" — warmer amber. */
+.tp-missed-chip.peeked {
+  background: oklch(0.96 0.05 85); color: oklch(0.46 0.1 85); border-color: oklch(0.86 0.08 85);
 }
 
 .tp-result-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 12px; width: 100%; }
