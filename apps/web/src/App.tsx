@@ -105,6 +105,8 @@ export function App() {
   function handleTypingProgress() {
     queryClient.invalidateQueries({ queryKey: ["typing-decks"] });
     queryClient.invalidateQueries({ queryKey: ["typing-stats"] });
+    queryClient.invalidateQueries({ queryKey: ["me-stats"] }); // refresh daily-goal ring (now counts typing XP)
+    queryClient.invalidateQueries({ queryKey: ["my-typing-sessions"] });
     api.me.get().then((me) => setUser(me)).catch(() => {});
   }
 

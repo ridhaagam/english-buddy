@@ -169,18 +169,23 @@ async def get_stats(
     total_sessions = row[0] or 0
     avg_accuracy = round(float(row[1] or 0))
 
-    result2 = await db.execute(
-        select(func.sum(Session.xp_earned))
-        .where(and_(Session.user_id == user.id, Session.started_at >= week_ago))
-    )
-    xp_this_week = int(result2.scalar() or 0)
+    # XP toward the daily goal / weekly total spans BOTH quiz and typing sessions.
+    from app.models.typing import TypingSession
 
+    async def _xp_since(since: datetime) -> int:
+        q = int((await db.execute(
+            select(func.sum(Session.xp_earned))
+            .where(and_(Session.user_id == user.id, Session.started_at >= since))
+        )).scalar() or 0)
+        t = int((await db.execute(
+            select(func.sum(TypingSession.xp_earned))
+            .where(and_(TypingSession.user_id == user.id, TypingSession.started_at >= since))
+        )).scalar() or 0)
+        return q + t
+
+    xp_this_week = await _xp_since(week_ago)
     today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-    result3 = await db.execute(
-        select(func.sum(Session.xp_earned))
-        .where(and_(Session.user_id == user.id, Session.started_at >= today_start))
-    )
-    xp_today = int(result3.scalar() or 0)
+    xp_today = await _xp_since(today_start)
 
     ach_result = await db.execute(
         select(UserAchievement).where(UserAchievement.user_id == user.id)
