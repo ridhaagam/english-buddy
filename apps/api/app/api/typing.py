@@ -19,8 +19,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.deps import CurrentUser
 from app.core.security import decode_token
-from app.models.typing import TypingAnswer, TypingSession, Word, WordDeck, WordProgress
-from app.models.user import User
+from app.models.typing import DeckAssignment, TypingAnswer, TypingSession, Word, WordDeck, WordProgress
+from app.models.user import User, UserRole
 from app.services.storage import get_file_path
 from app.services.streak import apply_daily_streak
 from app.services.word_audio import ensure_word_audio
@@ -29,6 +29,27 @@ router = APIRouter(tags=["typing"])
 
 CHAPTER_SIZE = 10
 REVIEW_LIMIT = 30
+
+
+def _is_staff(user) -> bool:
+    return user.role in (UserRole.admin, UserRole.owner, UserRole.editor)
+
+
+async def _assigned_deck_ids(db: AsyncSession, user_id: UUID) -> set[UUID]:
+    """Decks this learner has been directly assigned. Empty set = sees no decks."""
+    r = await db.execute(select(DeckAssignment.deck_id).where(DeckAssignment.user_id == user_id))
+    return {row[0] for row in r}
+
+
+async def _can_access_deck(db: AsyncSession, user, deck_id: UUID) -> bool:
+    if _is_staff(user):
+        return True
+    r = await db.execute(
+        select(DeckAssignment.deck_id).where(and_(
+            DeckAssignment.user_id == user.id, DeckAssignment.deck_id == deck_id,
+        ))
+    )
+    return r.first() is not None
 
 
 def _valid_audio_token(token: str) -> bool:
@@ -65,6 +86,13 @@ async def list_decks(
     decks = list(decks_r.scalars().all())
     if not decks:
         return []
+
+    # Learners see only decks assigned to them; staff preview everything.
+    if not _is_staff(user):
+        allowed = await _assigned_deck_ids(db, user.id)
+        decks = [d for d in decks if d.id in allowed]
+        if not decks:
+            return []
 
     deck_ids = [d.id for d in decks]
 
@@ -127,6 +155,8 @@ async def get_deck(
     deck = deck_r.scalar_one_or_none()
     if not deck or not deck.is_published:
         raise HTTPException(404, "Deck not found")
+    if not await _can_access_deck(db, user, deck_id):
+        raise HTTPException(404, "Deck not found")
 
     words_r = await db.execute(
         select(Word).where(Word.deck_id == deck_id).order_by(Word.position)
@@ -178,6 +208,8 @@ async def get_chapter(
     deck_r = await db.execute(select(WordDeck).where(WordDeck.id == deck_id))
     deck = deck_r.scalar_one_or_none()
     if not deck or not deck.is_published:
+        raise HTTPException(404, "Deck not found")
+    if not await _can_access_deck(db, user, deck_id):
         raise HTTPException(404, "Deck not found")
 
     words_r = await db.execute(
@@ -270,6 +302,8 @@ async def start_typing_session(
         deck_r = await db.execute(select(WordDeck).where(WordDeck.id == deck_uuid))
         if not deck_r.scalar_one_or_none():
             raise HTTPException(404, "Deck not found")
+        if not await _can_access_deck(db, user, deck_uuid):
+            raise HTTPException(403, "You do not have access to this deck")
 
     session = TypingSession(
         user_id=user.id,

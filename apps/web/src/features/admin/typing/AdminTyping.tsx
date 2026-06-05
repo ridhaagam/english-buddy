@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  PlusIcon, TrashIcon, XIcon, EditIcon, CheckIcon, KeyboardIcon, PlayIcon, EyeIcon,
+  PlusIcon, TrashIcon, XIcon, EditIcon, CheckIcon, KeyboardIcon, PlayIcon, EyeIcon, UsersIcon,
 } from "../../../components/ui";
 import { api } from "../../../lib/api";
 import "./AdminTyping.css";
@@ -71,7 +71,7 @@ function DeckList({ selectedId, onSelect }: { selectedId: string | null; onSelec
             <p className="atw-deck-sub">
               {d.cefr_level && <span className="mono">{d.cefr_level}</span>}
               <span>{d.word_count} word{d.word_count !== 1 ? "s" : ""}</span>
-              <span>{d.session_count} run{d.session_count !== 1 ? "s" : ""}</span>
+              <span>{d.assigned_count} assigned</span>
             </p>
           </div>
           <span
@@ -95,6 +95,7 @@ function DeckDetail({ deckId, onDeleted }: { deckId: string; onDeleted: () => vo
   const qc = useQueryClient();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [editOpen, setEditOpen] = useState(false);
+  const [assignOpen, setAssignOpen] = useState(false);
   const [wordModal, setWordModal] = useState<{ mode: "add" } | { mode: "edit"; word: any } | null>(null);
 
   const { data: deck, isLoading } = useQuery({ queryKey: ["admin-typing-deck", deckId], queryFn: () => api.admin.typing.getDeck(deckId) });
@@ -137,6 +138,7 @@ function DeckDetail({ deckId, onDeleted }: { deckId: string; onDeleted: () => vo
           {deck.description && <p style={{ margin: "6px 0 0", color: "var(--ink-2)", fontSize: 13 }}>{deck.description}</p>}
         </div>
         <div style={{ display: "flex", gap: 8, flexShrink: 0, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          <button className="btn ghost" style={{ gap: 6 }} onClick={() => setAssignOpen(true)}><UsersIcon size={13} /> Assign learners</button>
           <button className="btn ghost" style={{ gap: 6 }} onClick={() => togglePublish.mutate()}>
             {deck.is_published ? <><EyeIcon size={13} /> Published</> : <>Hidden</>}
           </button>
@@ -179,6 +181,7 @@ function DeckDetail({ deckId, onDeleted }: { deckId: string; onDeleted: () => vo
       )}
 
       {editOpen && <DeckModal deck={deck} onClose={() => setEditOpen(false)} onSaved={() => setEditOpen(false)} />}
+      {assignOpen && <AssignLearnersModal deckId={deckId} deckTitle={deck.title} onClose={() => setAssignOpen(false)} />}
       {wordModal && (
         <WordModal
           deckId={deckId}
@@ -325,6 +328,78 @@ function WordModal({ deckId, word, onClose }: { deckId: string; word?: any; onCl
       </div>
       {!editing && <p style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 8, display: "flex", alignItems: "center", gap: 5 }}><CheckIcon size={11} /> Audio is generated automatically on first play.</p>}
       {save.isError && <p style={{ color: "oklch(0.5 0.1 25)", fontSize: 12, marginTop: 6 }}>{String((save.error as any)?.message ?? "Error")}</p>}
+    </Modal>
+  );
+}
+
+function AssignLearnersModal({ deckId, deckTitle, onClose }: { deckId: string; deckTitle: string; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [selected, setSelected] = useState<Set<string> | null>(null);
+  const [search, setSearch] = useState("");
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin-typing-assignments", deckId],
+    queryFn: () => api.admin.typing.getAssignments(deckId),
+  });
+
+  const learners: any[] = data?.learners ?? [];
+  // Initialise selection from the server's "assigned" flags once loaded.
+  const sel = selected ?? new Set<string>(learners.filter((l) => l.assigned).map((l) => l.id));
+
+  const save = useMutation({
+    mutationFn: () => api.admin.typing.setAssignments(deckId, Array.from(sel)),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-typing-assignments", deckId] });
+      qc.invalidateQueries({ queryKey: ["admin-typing-decks"] });
+      onClose();
+    },
+  });
+
+  function toggle(id: string) {
+    const n = new Set(sel);
+    n.has(id) ? n.delete(id) : n.add(id);
+    setSelected(n);
+  }
+
+  const filtered = learners.filter((l) =>
+    !search || l.display_name.toLowerCase().includes(search.toLowerCase()) || l.email.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <Modal title="Assign learners" onClose={onClose}>
+      <p style={{ fontSize: 13, color: "var(--ink-2)", margin: "0 0 12px" }}>
+        Pick who can practise <strong>{deckTitle}</strong>. Unchecked learners can't see it.
+      </p>
+      <input className="input" style={{ ...inputStyle, marginBottom: 10 }} placeholder="Search learners…" value={search}
+        onChange={(e) => setSearch(e.target.value)} autoFocus />
+      {isLoading ? (
+        <p style={{ color: "var(--ink-3)", fontSize: 13 }}>Loading…</p>
+      ) : learners.length === 0 ? (
+        <p style={{ color: "var(--ink-3)", fontSize: 13 }}>No learner accounts yet.</p>
+      ) : filtered.length === 0 ? (
+        <p style={{ color: "var(--ink-3)", fontSize: 13 }}>No learners match.</p>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 320, overflowY: "auto" }}>
+          {filtered.map((l) => (
+            <label key={l.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: "var(--r-sm)", background: sel.has(l.id) ? "var(--accent-soft)" : "var(--bg-2)", border: `1px solid ${sel.has(l.id) ? "var(--accent)" : "var(--line-2)"}`, cursor: "pointer" }}>
+              <input type="checkbox" checked={sel.has(l.id)} onChange={() => toggle(l.id)} style={{ accentColor: "var(--accent)" }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ fontSize: 13, fontWeight: 500 }}>{l.display_name}</span>
+                <span style={{ marginLeft: 8, fontSize: 11, color: "var(--ink-3)" }}>{l.email}</span>
+              </div>
+              {sel.has(l.id) && <CheckIcon size={12} />}
+            </label>
+          ))}
+        </div>
+      )}
+      <div style={{ display: "flex", gap: 8, justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
+        <span style={{ fontSize: 12, color: "var(--ink-3)" }}>{sel.size} selected</span>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="btn ghost" onClick={onClose}>Cancel</button>
+          <button className="btn accent" disabled={save.isPending} onClick={() => save.mutate()}>
+            {save.isPending ? "Saving…" : "Save"}
+          </button>
+        </div>
+      </div>
     </Modal>
   );
 }

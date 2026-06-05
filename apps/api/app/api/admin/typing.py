@@ -17,7 +17,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.deps import AdminUser
-from app.models.typing import TypingSession, Word, WordDeck
+from app.models.typing import DeckAssignment, TypingSession, Word, WordDeck
+from app.models.user import User, UserRole
 
 router = APIRouter(prefix="/admin/typing", tags=["admin-typing"])
 
@@ -104,6 +105,11 @@ async def list_decks(user: AdminUser, db: Annotated[AsyncSession, Depends(get_db
         .where(TypingSession.deck_id.in_(ids), TypingSession.finished_at.isnot(None))
         .group_by(TypingSession.deck_id)
     )}
+    assigned = {row.deck_id: row.cnt for row in await db.execute(
+        select(DeckAssignment.deck_id, func.count().label("cnt"))
+        .where(DeckAssignment.deck_id.in_(ids))
+        .group_by(DeckAssignment.deck_id)
+    )}
 
     return [
         {
@@ -118,6 +124,7 @@ async def list_decks(user: AdminUser, db: Annotated[AsyncSession, Depends(get_db
             "word_count": counts.get(d.id, 0),
             "chapter_count": max(1, (counts.get(d.id, 0) + CHAPTER_SIZE - 1) // CHAPTER_SIZE) if counts.get(d.id, 0) else 0,
             "session_count": sessions.get(d.id, 0),
+            "assigned_count": assigned.get(d.id, 0),
         }
         for d in decks
     ]
@@ -244,3 +251,41 @@ async def delete_word(word_id: UUID, user: AdminUser, db: Annotated[AsyncSession
         raise HTTPException(404, "Word not found")
     await db.execute(sa_delete(Word).where(Word.id == word_id))
     await db.commit()
+
+
+# ── Learner assignments ───────────────────────────────────────────────────────
+
+
+class AssignBody(BaseModel):
+    user_ids: list[str] = []
+
+
+@router.get("/decks/{deck_id}/assignments")
+async def get_deck_assignments(deck_id: UUID, user: AdminUser, db: Annotated[AsyncSession, Depends(get_db)]):
+    if not (await db.execute(select(WordDeck.id).where(WordDeck.id == deck_id))).first():
+        raise HTTPException(404, "Deck not found")
+    assigned_r = await db.execute(select(DeckAssignment.user_id).where(DeckAssignment.deck_id == deck_id))
+    assigned = {row[0] for row in assigned_r}
+    learners_r = await db.execute(
+        select(User).where(User.role == UserRole.learner).order_by(User.display_name)
+    )
+    return {
+        "learners": [
+            {"id": str(u.id), "display_name": u.display_name, "email": u.email, "assigned": u.id in assigned}
+            for u in learners_r.scalars()
+        ]
+    }
+
+
+@router.put("/decks/{deck_id}/assignments")
+async def set_deck_assignments(deck_id: UUID, body: AssignBody, user: AdminUser, db: Annotated[AsyncSession, Depends(get_db)]):
+    if not (await db.execute(select(WordDeck.id).where(WordDeck.id == deck_id))).first():
+        raise HTTPException(404, "Deck not found")
+    await db.execute(sa_delete(DeckAssignment).where(DeckAssignment.deck_id == deck_id))
+    for uid_str in body.user_ids:
+        try:
+            db.add(DeckAssignment(deck_id=deck_id, user_id=UUID(uid_str), assigned_by=user.id))
+        except ValueError:
+            continue
+    await db.commit()
+    return {"ok": True, "assigned": len(body.user_ids)}

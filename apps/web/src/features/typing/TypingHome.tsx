@@ -75,6 +75,16 @@ export function TypingHome({ onPlay }: { onPlay: (l: TypingLaunch) => void }) {
 
       <div className="tw-deck-grid">
         {decksQ.isLoading && <div className="tw-loading"><span className="dot-load"><i /><i /><i /></span></div>}
+        {!decksQ.isLoading && decks.length === 0 && (
+          <div className="tw-empty">
+            <div className="tw-empty-mark"><KeyboardIcon size={28} /></div>
+            <p className="serif tw-empty-title">No decks assigned yet</p>
+            <p className="tw-empty-sub">
+              Your teacher hasn’t shared any typing decks with you yet.
+              {stats && stats.review_count > 0 ? " You can still review your tricky words above." : " Check back soon."}
+            </p>
+          </div>
+        )}
         {decks.map((d: any, i: number) => {
           const pct = d.word_count ? Math.round((d.mastered_count / d.word_count) * 100) : 0;
           return (

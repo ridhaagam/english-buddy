@@ -70,6 +70,21 @@ class TypingSession(Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class DeckAssignment(Base):
+    """Direct per-learner access to a typing deck.
+
+    A deck with no assignment rows is visible to nobody (learners) — decks are
+    hidden until explicitly assigned. Staff bypass this in the API.
+    """
+
+    __tablename__ = "english_deck_assignments"
+
+    deck_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("english_word_decks.id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("english_users.id", ondelete="CASCADE"), primary_key=True)
+    assigned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    assigned_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("english_users.id"), nullable=True)
+
+
 class TypingAnswer(Base):
     """Per-word outcome of a single typing session — backs the practice-history detail.
 

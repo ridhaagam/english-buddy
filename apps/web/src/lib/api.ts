@@ -312,6 +312,9 @@ export const api = {
       updateWord: (wordId: string, data: { word: string; phonetic?: string; pos?: string; translation?: string; example?: string; example_translation?: string }) =>
         request<any>(`/admin/typing/words/${wordId}`, { method: "PATCH", body: JSON.stringify(data) }),
       deleteWord: (wordId: string) => request<void>(`/admin/typing/words/${wordId}`, { method: "DELETE" }),
+      getAssignments: (deckId: string) => request<{ learners: any[] }>(`/admin/typing/decks/${deckId}/assignments`),
+      setAssignments: (deckId: string, user_ids: string[]) =>
+        request<any>(`/admin/typing/decks/${deckId}/assignments`, { method: "PUT", body: JSON.stringify({ user_ids }) }),
     },
     courses: {
       list: () => request<any[]>("/admin/courses"),
