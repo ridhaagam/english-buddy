@@ -35,6 +35,9 @@ class User(Base):
     role: Mapped[UserRole] = mapped_column(Enum(UserRole, name="user_role", create_type=False), nullable=False, default=UserRole.learner)
     cefr_level: Mapped[CefrLevel | None] = mapped_column(Enum(CefrLevel, name="cefr_level", create_type=False), nullable=True)
     streak: Mapped[int] = mapped_column(default=0)
+    # The calendar day the streak was last advanced. Separate from last_seen_at
+    # (which login/activity bumps) so a same-day login can't pre-empt the streak.
+    streak_day: Mapped[date | None] = mapped_column(Date, nullable=True)
     xp_total: Mapped[int] = mapped_column(default=0)
     daily_goal_xp: Mapped[int] = mapped_column(default=200)
     avatar_url: Mapped[str | None] = mapped_column(Text, nullable=True)

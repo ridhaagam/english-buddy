@@ -22,6 +22,7 @@ from app.core.security import decode_token
 from app.models.typing import TypingAnswer, TypingSession, Word, WordDeck, WordProgress
 from app.models.user import User
 from app.services.storage import get_file_path
+from app.services.streak import apply_daily_streak
 from app.services.word_audio import ensure_word_audio
 
 router = APIRouter(tags=["typing"])
@@ -399,13 +400,7 @@ async def finish_typing_session(
     if xp:
         await db.execute(update(User).where(User.id == user.id).values(xp_total=User.xp_total + xp))
 
-    today = now.date()
-    if user.last_seen_at:
-        last_day = user.last_seen_at.date() if hasattr(user.last_seen_at, "date") else today
-        if last_day < today:
-            user.streak = user.streak + 1 if (today - last_day).days == 1 else 1
-    else:
-        user.streak = 1
+    apply_daily_streak(user, now.date())  # UTC day; shared rule, decoupled from last_seen_at
     user.last_seen_at = now
 
     await db.commit()

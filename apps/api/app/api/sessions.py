@@ -7,7 +7,7 @@ from uuid import UUID
 from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -17,8 +17,9 @@ from app.models.course import CourseModule, CourseUser, ModuleAssignment
 from app.models.module import Module, ModuleStatus, TopicType
 from app.models.question import Question
 from app.models.session import Session, SessionAnswer, SessionEvent
-from app.models.user import UserRole
+from app.models.user import User, UserRole
 from app.services.reveal import compute_reveal
+from app.services.streak import apply_daily_streak
 from app.services.storage import append_object, get_file_path, object_exists, put_object
 
 logger = logging.getLogger(__name__)
@@ -450,18 +451,12 @@ async def finish_session(
         session.tab_switch_count = body.tab_switch_count
         session.face_anomaly_count = body.face_anomaly_count
 
-    await db.refresh(user)  # avoid stale xp_total on concurrent sessions
-    user.xp_total += xp
-
-    today = datetime.now(timezone.utc).date()  # use UTC to match DB timestamps
-    if user.last_seen_at:
-        last_day = user.last_seen_at.date() if hasattr(user.last_seen_at, 'date') else today
-        if last_day < today:
-            user.streak = user.streak + 1 if (today - last_day).days == 1 else 1
-    else:
-        user.streak = 1
-
-    user.last_seen_at = datetime.now(timezone.utc)
+    # Atomic increment — no read-modify-write race when sessions finish concurrently.
+    now = datetime.now(timezone.utc)
+    if xp:
+        await db.execute(update(User).where(User.id == user.id).values(xp_total=User.xp_total + xp))
+    apply_daily_streak(user, now.date())  # UTC day, matches DB timestamps
+    user.last_seen_at = now
 
     await db.commit()
 
