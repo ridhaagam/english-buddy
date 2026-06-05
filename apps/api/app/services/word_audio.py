@@ -9,6 +9,7 @@ admin-added words work without a separate build step.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import os
 import uuid
 
@@ -22,8 +23,18 @@ WORD_RATE = "-8%"
 _locks: dict[str, asyncio.Lock] = {}
 
 
-def audio_key_for_word(word_id: uuid.UUID | str) -> str:
-    return f"word_audio/{word_id}.mp3"
+def audio_key_for_word(word_id: uuid.UUID | str, text: str, voice: str | None = None) -> str:
+    """Content-addressed storage key for a word's audio.
+
+    The key folds the spoken text (plus voice + rate) into a short digest, so
+    editing a word's text changes the key and the next play synthesises fresh
+    audio — the old clip is simply orphaned. Keying on the word id alone would
+    happily keep serving the *previous* word's pronunciation after a re-seed.
+    Both the seed-time pre-render and the request-time lookup pass identical
+    (text, voice), so they resolve to the same file.
+    """
+    digest = hashlib.sha1(f"{text}\x1f{voice or ''}\x1f{WORD_RATE}".encode()).hexdigest()[:10]
+    return f"word_audio/{word_id}-{digest}.mp3"
 
 
 async def ensure_word_audio(word_id: uuid.UUID | str, text: str, voice: str | None = None) -> str:
@@ -32,11 +43,11 @@ async def ensure_word_audio(word_id: uuid.UUID | str, text: str, voice: str | No
     The write is atomic (temp file + ``os.replace``) so a concurrent reader never
     sees a half-written MP3, and a per-key lock avoids duplicate synthesis.
     """
-    key = audio_key_for_word(word_id)
+    key = audio_key_for_word(word_id, text, voice)
     if object_exists(key):
         return key
 
-    lock = _locks.setdefault(str(word_id), asyncio.Lock())
+    lock = _locks.setdefault(key, asyncio.Lock())
     async with lock:
         if object_exists(key):  # another coroutine finished while we waited
             return key
@@ -50,7 +61,7 @@ async def ensure_word_audio(word_id: uuid.UUID | str, text: str, voice: str | No
 
 def ensure_word_audio_sync(word_id: uuid.UUID | str, text: str, voice: str | None = None) -> str:
     """Blocking variant for the seed script (no running event loop required)."""
-    key = audio_key_for_word(word_id)
+    key = audio_key_for_word(word_id, text, voice)
     if object_exists(key):
         return key
     data = asyncio.run(synthesize(text, voice=voice, rate=WORD_RATE))
